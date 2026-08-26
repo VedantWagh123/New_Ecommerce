@@ -1,0 +1,73 @@
+{
+  "evaluatedAt": "2026-08-25T04:10:34.506Z",
+  "results": [
+    {
+      "test": "Strict Men's Category Search",
+      "prompt": "black shirt for men aesthetic",
+      "baseModel": {
+        "latencyMs": 28,
+        "matchesCount": 0,
+        "categoriesReturned": [],
+        "replySnippet": ""
+      },
+      "fineTunedModel": {
+        "latencyMs": 3,
+        "matchesCount": 0,
+        "categoriesReturned": [],
+        "replySnippet": "",
+        "comparisonProvided": false
+      }
+    },
+    {
+      "test": "Price & Budget Filter",
+      "prompt": "college outfit under 3000",
+      "baseModel": {
+        "latencyMs": 2,
+        "matchesCount": 0,
+        "categoriesReturned": [],
+        "replySnippet": ""
+      },
+      "fineTunedModel": {
+        "latencyMs": 2,
+        "matchesCount": 0,
+        "categoriesReturned": [],
+        "replySnippet": "",
+        "comparisonProvided": false
+      }
+    },
+    {
+      "test": "Price & Specs Comparison",
+      "prompt": "compare price for pink shirt",
+      "baseModel": {
+        "latencyMs": 2,
+        "matchesCount": 0,
+        "categoriesReturned": [],
+        "replySnippet": ""
+      },
+      "fineTunedModel": {
+        "latencyMs": 1,
+        "matchesCount": 0,
+        "categoriesReturned": [],
+        "replySnippet": "",
+        "comparisonProvided": false
+      }
+    },
+    {
+      "test": "Casual Stylist Conversation",
+      "prompt": "kaise ho bhai?",
+      "baseModel": {
+        "latencyMs": 3,
+        "matchesCount": 0,
+        "categoriesReturned": [],
+        "replySnippet": ""
+      },
+      "fineTunedModel": {
+        "latencyMs": 1,
+        "matchesCount": 0,
+        "categoriesReturned": [],
+        "replySnippet": "",
+        "comparisonProvided": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "totalConversations": 15,
+  "categories": [
+    "product_search_men",
+    "product_search_women",
+    "product_search_kids",
+    "price_filter",
+    "outfit_recommendation",
+    "price_comparison",
+    "cart_management",
+    "order_tracking",
+    "store_policy",
+    "general_conversation"
+  ],
+  "generatedAt": "2026-08-25T04:08:43.907Z",
+  "formats": [
+    "dataset_chatml.jsonl",
+    "dataset_alpaca.json"
+  ]
+}
