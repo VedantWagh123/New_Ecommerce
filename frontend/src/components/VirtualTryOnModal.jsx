@@ -117,7 +117,7 @@ const VirtualTryOnModal = ({ isOpen, onClose, productData }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
       <div 
-        className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col md:flex-row shadow-2xl overflow-hidden border border-gray-100"
+        className="bg-white rounded-3xl max-w-4xl w-full max-h-[95vh] md:max-h-[90vh] flex flex-col md:flex-row shadow-2xl overflow-hidden border border-gray-100"
         onClick={(e) => e.stopPropagation()}
       >
         
@@ -167,7 +167,7 @@ const VirtualTryOnModal = ({ isOpen, onClose, productData }) => {
           </div>
 
           {/* Main Content Area */}
-          <div className="flex-1 p-6 flex items-center justify-center min-h-[400px] overflow-y-auto bg-white">
+          <div className="flex-1 p-4 md:p-6 flex items-center justify-center min-h-[400px] overflow-y-auto bg-white">
             
             {/* STEP 1: UPLOAD */}
             {step === 1 && (
