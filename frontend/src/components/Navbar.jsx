@@ -228,6 +228,19 @@ const Navbar = () => {
                     <NavLink onClick={()=>setVisible(false)} className='py-2 pl-6 border text-amber-600 font-bold flex items-center gap-1' to='/membership'>👑 PREMIUM — ₹1</NavLink>
                     <NavLink onClick={()=>setVisible(false)} className='py-2 pl-6 border' to='/about'>ABOUT</NavLink>
                     <NavLink onClick={()=>setVisible(false)} className='py-2 pl-6 border' to='/contact'>CONTACT</NavLink>
+                    {/* Mobile Only Auth/Profile Links */}
+                    <div className="mt-4 border-t pt-4">
+                        {token ? (
+                            <>
+                                <NavLink onClick={()=>setVisible(false)} className='py-2 pl-6 border-b block font-semibold text-gray-800' to='/profile'>My Profile</NavLink>
+                                <NavLink onClick={()=>setVisible(false)} className='py-2 pl-6 border-b block font-semibold text-gray-800' to='/orders'>My Orders</NavLink>
+                                <NavLink onClick={()=>setVisible(false)} className='py-2 pl-6 border-b block font-semibold text-gray-800' to='/wishlist'>Wishlist ({wishlist?.length || 0})</NavLink>
+                                <button onClick={() => { setVisible(false); logout(); }} className='w-full text-left py-2 pl-6 border-b font-semibold text-rose-600 block'>Logout</button>
+                            </>
+                        ) : (
+                            <NavLink onClick={()=>setVisible(false)} className='py-2 pl-6 border-b block font-semibold text-indigo-600' to='/login'>Login / Register</NavLink>
+                        )}
+                    </div>
                 </div>
         </div>
 
