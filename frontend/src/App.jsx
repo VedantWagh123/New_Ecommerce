@@ -27,7 +27,7 @@ import ResetPassword from './pages/ResetPassword'
 
 const App = () => {
   return (
-    <div className='px-4 sm:px-[5vw] md:px-[7vw] lg:px-[9vw] min-h-screen flex flex-col justify-between relative'>
+    <div className='px-4 sm:px-[5vw] md:px-[7vw] lg:px-[9vw] min-h-screen flex flex-col justify-between relative overflow-x-hidden'>
       <div>
         <ToastContainer />
         <Navbar />

@@ -22,8 +22,8 @@ const Hero = () => {
             <p className="text-gray-400 text-xs sm:text-sm tracking-[0.5em] uppercase font-light">
               Premium Collection 2026
             </p>
-            <h1 className="text-5xl sm:text-7xl md:text-8xl prata-regular text-gray-900 leading-[1.1] transform transition-transform duration-700">
-              Redefine Your <br className="hidden sm:block" /> <span className="italic">Style</span>
+            <h1 className="text-4xl sm:text-7xl md:text-8xl prata-regular text-gray-900 leading-[1.1] transform transition-transform duration-700">
+              Redefine Your <br className="block" /> <span className="italic">Style</span>
             </h1>
             <p className="text-gray-500 text-base sm:text-xl font-light max-w-lg mx-auto lg:mx-0 leading-relaxed">
               Experience the pinnacle of luxury fashion where minimal design meets maximum impact. 
