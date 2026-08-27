@@ -47,29 +47,31 @@ const App = () => {
           <Navbar setToken={setToken} setRole={setRole} role={role} />
           <div className='flex w-full'>
             <Sidebar role={role} />
-            <main className='flex-1 w-full mx-auto px-4 sm:px-8 py-6 text-slate-700 text-base overflow-x-hidden'>
-              <Routes>
-                <Route path='/' element={<Dashboard token={token} />} />
-                <Route path='/dashboard' element={<Dashboard token={token} />} />
-                <Route path='/flash-sale' element={<FlashSaleManager token={token} />} />
-                <Route path='/trending' element={<TrendingManagement token={token} />} />
-                <Route path='/bank-offers' element={<BankOffers token={token} />} />
-                <Route path='/subscriptions' element={<Subscriptions token={token} />} />
-                <Route path='/add' element={<Add token={token} />} />
-                <Route path='/list' element={<List token={token} />} />
-                <Route path='/orders' element={<Orders token={token} />} />
-                <Route path='/reviews' element={<Reviews token={token} />} />
-                <Route path='/sellers' element={<Sellers token={token} />} />
-                <Route path='/product-approvals' element={<ProductApprovals token={token} />} />
-                <Route path='/sub-admins' element={<SubAdmins token={token} />} />
-                <Route path='/coupons' element={<Coupons token={token} />} />
-                <Route path='/finances' element={<Finances token={token} role={role} />} />
-                <Route path='/analytics' element={<Analytics token={token} />} />
-                <Route path='/stories' element={<Stories token={token} />} />
-                <Route path='/add-video' element={<AddVideo token={token} />} />
-                <Route path='/manage-videos' element={<ManageVideos token={token} />} />
-                <Route path='/settings' element={<GlobalSettings token={token} role={role} />} />
-              </Routes>
+            <main className='flex-1 w-full text-slate-700 text-base overflow-x-hidden bg-slate-50'>
+              <div className='max-w-[1400px] mx-auto px-4 sm:px-8 py-6 w-full'>
+                <Routes>
+                  <Route path='/' element={<Dashboard token={token} />} />
+                  <Route path='/dashboard' element={<Dashboard token={token} />} />
+                  <Route path='/flash-sale' element={<FlashSaleManager token={token} />} />
+                  <Route path='/trending' element={<TrendingManagement token={token} />} />
+                  <Route path='/bank-offers' element={<BankOffers token={token} />} />
+                  <Route path='/subscriptions' element={<Subscriptions token={token} />} />
+                  <Route path='/add' element={<Add token={token} />} />
+                  <Route path='/list' element={<List token={token} />} />
+                  <Route path='/orders' element={<Orders token={token} />} />
+                  <Route path='/reviews' element={<Reviews token={token} />} />
+                  <Route path='/sellers' element={<Sellers token={token} />} />
+                  <Route path='/product-approvals' element={<ProductApprovals token={token} />} />
+                  <Route path='/sub-admins' element={<SubAdmins token={token} />} />
+                  <Route path='/coupons' element={<Coupons token={token} />} />
+                  <Route path='/finances' element={<Finances token={token} role={role} />} />
+                  <Route path='/analytics' element={<Analytics token={token} />} />
+                  <Route path='/stories' element={<Stories token={token} />} />
+                  <Route path='/add-video' element={<AddVideo token={token} />} />
+                  <Route path='/manage-videos' element={<ManageVideos token={token} />} />
+                  <Route path='/settings' element={<GlobalSettings token={token} role={role} />} />
+                </Routes>
+              </div>
             </main>
           </div>
         </>
