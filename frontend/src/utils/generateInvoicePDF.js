@@ -136,8 +136,10 @@ export const generateInvoicePDF = (order) => {
     const finalY = doc.lastAutoTable.finalY + 15;
     const totalAmount = order.amount || items.reduce((sum, i) => sum + ((i.price || 0) * (i.quantity || 1)), 0);
     
-    const taxable = Math.round(totalAmount / 1.18);
-    const gst = totalAmount - taxable;
+    const subtotal = order.subtotal || Math.round(totalAmount / 1.18);
+    const gst = order.tax !== undefined ? order.tax : (totalAmount - subtotal);
+    const platformFee = order.platformFee || 0;
+    const deliveryFee = order.deliveryFee || 0;
 
     // Payment Info
     doc.setFont('helvetica', 'bold');
@@ -155,15 +157,19 @@ export const generateInvoicePDF = (order) => {
 
     doc.setFont('helvetica', 'normal');
     doc.text('Subtotal:', 140, sumY);
-    doc.text(`INR ${taxable.toLocaleString('en-IN')}`, 196, sumY, { align: 'right' });
+    doc.text(`INR ${subtotal.toLocaleString('en-IN')}`, 196, sumY, { align: 'right' });
     sumY += 7;
 
-    doc.text('GST (18%):', 140, sumY);
+    doc.text('Platform Fee:', 140, sumY);
+    doc.text(`INR ${platformFee.toLocaleString('en-IN')}`, 196, sumY, { align: 'right' });
+    sumY += 7;
+
+    doc.text('GST (3%):', 140, sumY);
     doc.text(`INR ${gst.toLocaleString('en-IN')}`, 196, sumY, { align: 'right' });
     sumY += 7;
 
     doc.text('Shipping:', 140, sumY);
-    doc.text('FREE', 196, sumY, { align: 'right' });
+    doc.text(deliveryFee > 0 ? `INR ${deliveryFee.toLocaleString('en-IN')}` : 'FREE', 196, sumY, { align: 'right' });
     sumY += 7;
 
     doc.setDrawColor(...borderGray);

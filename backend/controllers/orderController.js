@@ -63,7 +63,7 @@ const placeOrder = async (req,res) => {
     
     try {
         
-        const { userId, items, amount, address, couponCode, couponDiscount} = req.body;
+        const { userId, items, amount, address, couponCode, couponDiscount, tax, platformFee, subtotal, deliveryFee} = req.body;
 
         // AI Karma Score Check for COD
         const user = await userModel.findById(userId);
@@ -82,6 +82,10 @@ const placeOrder = async (req,res) => {
             items: enrichedItems,
             address,
             amount,
+            tax: tax || 0,
+            platformFee: platformFee || 0,
+            subtotal: subtotal || 0,
+            deliveryFee: deliveryFee || 0,
             couponCode: couponCode || '',
             couponDiscount: couponDiscount || 0,
             status: initialStatus,
@@ -117,7 +121,7 @@ const placeOrder = async (req,res) => {
 const placeOrderStripe = async (req,res) => {
     try {
         
-        const { userId, items, amount, address, couponCode, couponDiscount} = req.body
+        const { userId, items, amount, address, couponCode, couponDiscount, tax, platformFee, subtotal, deliveryFee} = req.body
         const enrichedItems = await enrichItemsWithSellerId(items);
         const { origin } = req.headers;
         const now = Date.now();
@@ -130,6 +134,10 @@ const placeOrderStripe = async (req,res) => {
             items: enrichedItems,
             address,
             amount,
+            tax: tax || 0,
+            platformFee: platformFee || 0,
+            subtotal: subtotal || 0,
+            deliveryFee: deliveryFee || 0,
             couponCode: couponCode || '',
             couponDiscount: couponDiscount || 0,
             status: initialStatus,
@@ -213,7 +221,7 @@ const verifyStripe = async (req,res) => {
 const placeOrderRazorpay = async (req,res) => {
     try {
         
-        const { userId, items, amount, address, couponCode, couponDiscount} = req.body
+        const { userId, items, amount, address, couponCode, couponDiscount, tax, platformFee, subtotal, deliveryFee} = req.body
         const enrichedItems = await enrichItemsWithSellerId(items);
         const now = Date.now();
 
@@ -225,6 +233,10 @@ const placeOrderRazorpay = async (req,res) => {
             items: enrichedItems,
             address,
             amount,
+            tax: tax || 0,
+            platformFee: platformFee || 0,
+            subtotal: subtotal || 0,
+            deliveryFee: deliveryFee || 0,
             couponCode: couponCode || '',
             couponDiscount: couponDiscount || 0,
             status: initialStatus,

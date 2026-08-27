@@ -26,7 +26,7 @@ const PlaceOrder = () => {
         getCartTotals
     } = useContext(ShopContext);
 
-    const { subtotal, finalTotal, deliveryFee, couponCode, couponDiscountAmount } = getCartTotals();
+    const { subtotal, finalTotal, deliveryFee, couponCode, couponDiscountAmount, tax, platformFee } = getCartTotals();
 
     useEffect(() => {
         if (karmaScore < 40 && method === 'cod') {
@@ -158,6 +158,10 @@ const PlaceOrder = () => {
                 address: formData,
                 items: orderItems,
                 amount: finalTotal,
+                tax: tax,
+                platformFee: platformFee,
+                subtotal: subtotal,
+                deliveryFee: deliveryFee,
                 couponCode: couponCode || '',
                 couponDiscount: couponDiscountAmount || 0
             };

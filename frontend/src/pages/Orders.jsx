@@ -193,6 +193,16 @@ const Orders = () => {
                     <span>Payment: <strong className='text-gray-800 uppercase'>{order.paymentMethod}</strong></span>
                     <span className='mx-2'>•</span>
                     <span>Total Amount: <strong className='text-black text-sm'>{currency}{order.amount?.toFixed(2)}</strong></span>
+                    
+                    {(order.tax > 0 || order.platformFee > 0) && (
+                      <div className='mt-1 text-gray-400'>
+                        <span className='mr-2'>(Includes</span>
+                        {order.platformFee > 0 && <span>Platform Fee: {currency}{order.platformFee?.toFixed(2)}</span>}
+                        {order.platformFee > 0 && order.tax > 0 && <span className='mx-1'>&</span>}
+                        {order.tax > 0 && <span>GST: {currency}{order.tax?.toFixed(2)}</span>}
+                        <span>)</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className='flex items-center gap-2.5 self-end sm:self-auto flex-wrap'>

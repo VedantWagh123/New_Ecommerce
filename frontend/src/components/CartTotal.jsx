@@ -4,7 +4,7 @@ import Title from './Title';
 
 const CartTotal = () => {
     const { currency, getCartTotals } = useContext(ShopContext);
-    const { subtotal, totalMRP, totalDiscount, vipDiscount, couponDiscountAmount, couponCode, isVip, deliveryFee, isFreeDelivery, finalTotal, totalSavings } = getCartTotals();
+    const { subtotal, totalMRP, totalDiscount, vipDiscount, couponDiscountAmount, couponCode, isVip, deliveryFee, isFreeDelivery, platformFee, tax, finalTotal, totalSavings } = getCartTotals();
 
     return (
         <div className='w-full bg-white rounded-xl border border-gray-100 p-5 shadow-sm space-y-3'>
@@ -71,6 +71,20 @@ const CartTotal = () => {
                         </p>
                     )}
                 </div>
+
+                {subtotal > 0 && (
+                    <div className='flex justify-between items-center'>
+                        <p className='text-gray-600'>Platform Fee</p>
+                        <p className='font-medium text-gray-900'>{currency}{platformFee.toFixed(2)}</p>
+                    </div>
+                )}
+
+                {subtotal > 0 && (
+                    <div className='flex justify-between items-center'>
+                        <p className='text-gray-600'>Estimated GST (3%)</p>
+                        <p className='font-medium text-gray-900'>{currency}{tax.toFixed(2)}</p>
+                    </div>
+                )}
 
                 <div className='border-t border-dashed my-1'></div>
 

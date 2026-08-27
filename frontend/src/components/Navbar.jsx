@@ -12,7 +12,7 @@ const Navbar = () => {
     const profileRef = useRef(null);
     const timeoutRef = useRef(null);
 
-    const {setShowSearch, getCartCount, navigate, token, setToken, setCartItems, wishlist, sellerStatus, vipStatus} = useContext(ShopContext);
+    const {setShowSearch, getCartCount, navigate, token, setToken, setCartItems, wishlist, sellerStatus, vipStatus, setCouponData} = useContext(ShopContext);
 
     const logout = () => {
         setIsProfileOpen(false);
@@ -20,6 +20,7 @@ const Navbar = () => {
         localStorage.removeItem('token');
         setToken('');
         setCartItems({});
+        setCouponData({ code: '', discount: 0 });
     }
 
     // Hover Handler with 150ms Grace Period

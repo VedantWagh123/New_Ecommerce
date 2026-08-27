@@ -264,7 +264,12 @@ const ShopContextProvider = (props) => {
         const totalDiscount = Math.max(0, totalMRP - subtotal);
         const vipDiscount = isVip ? Math.round(subtotal * 0.10) : 0;
         const couponDiscountAmount = couponData.discount || 0;
-        const finalTotal = subtotal > 0 ? Math.max(0, subtotal - vipDiscount - couponDiscountAmount + actualDeliveryFee) : 0;
+        
+        const platformFee = subtotal > 0 ? 2 : 0;
+        const subtotalAfterDiscounts = Math.max(0, subtotal - vipDiscount - couponDiscountAmount);
+        const tax = subtotal > 0 ? Math.round(subtotalAfterDiscounts * 0.03) : 0; // 3% GST
+        
+        const finalTotal = subtotal > 0 ? (subtotalAfterDiscounts + actualDeliveryFee + platformFee + tax) : 0;
         const totalSavings = totalDiscount + vipDiscount + couponDiscountAmount + (subtotal > 0 && isFreeDelivery ? delivery_fee : 0);
 
         return {
@@ -277,6 +282,8 @@ const ShopContextProvider = (props) => {
             isVip,
             deliveryFee: actualDeliveryFee,
             isFreeDelivery,
+            platformFee,
+            tax,
             finalTotal,
             totalSavings,
             freeDeliveryThreshold: 150
