@@ -1,5 +1,5 @@
 import express from 'express';
-import { loginUser, registerUser, adminLogin, getSellers, approveSeller, rejectSeller, deleteSeller, getSubAdmins, addSubAdmin, deleteSubAdmin, getUserProfile, updateUserProfile, forgotPassword, resetPassword, verifyOtp, resendOtp } from '../controllers/userController.js';
+import { loginUser, registerUser, adminLogin, getSellers, approveSeller, rejectSeller, deleteSeller, getSubAdmins, addSubAdmin, deleteSubAdmin, getUserProfile, updateUserProfile, forgotPassword, verifyResetOtp, resetPassword, verifyOtp, resendOtp } from '../controllers/userController.js';
 import adminAuth from '../middleware/adminAuth.js';
 import roleAuth from '../middleware/roleAuth.js';
 import authUser from '../middleware/auth.js';
@@ -30,6 +30,7 @@ userRouter.post('/update-profile', authUser, upload.single('avatar'), updateUser
 
 // Password Reset Routes
 userRouter.post('/forgot-password', forgotPassword);
+userRouter.post('/verify-reset-otp', verifyResetOtp);
 userRouter.post('/reset-password', resetPassword);
 
 export default userRouter;

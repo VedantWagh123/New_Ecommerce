@@ -496,6 +496,35 @@ const forgotPassword = async (req, res) => {
     }
 }
 
+// Verify Reset OTP
+const verifyResetOtp = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        
+        if (!email || !otp) {
+            return res.json({ success: false, message: "Email and OTP are required" });
+        }
+
+        const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+
+        const user = await userModel.findOne({
+            email,
+            resetToken: hashedOtp,
+            resetTokenExpire: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.json({ success: false, message: 'Invalid or expired OTP' });
+        }
+
+        res.json({ success: true, message: 'OTP verified successfully' });
+
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
 // Reset Password via OTP
 const resetPassword = async (req, res) => {
     try {
@@ -530,4 +559,4 @@ const resetPassword = async (req, res) => {
         res.json({ success: false, message: error.message });
     }
 }
-export { loginUser, registerUser, adminLogin, getSellers, approveSeller, rejectSeller, deleteSeller, getSubAdmins, addSubAdmin, deleteSubAdmin, getUserProfile, updateUserProfile, forgotPassword, resetPassword, verifyOtp, resendOtp }
+export { loginUser, registerUser, adminLogin, getSellers, approveSeller, rejectSeller, deleteSeller, getSubAdmins, addSubAdmin, deleteSubAdmin, getUserProfile, updateUserProfile, forgotPassword, verifyResetOtp, resetPassword, verifyOtp, resendOtp }

@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState, useRef } from 'react'
 import { ShopContext } from '../context/ShopContext';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
 
@@ -11,6 +12,7 @@ const Login = () => {
   const [name,setName] = useState('')
   const [password,setPasword] = useState('')
   const [email,setEmail] = useState('')
+  const [showPassword, setShowPassword] = useState(false);
   
   const [isLoading, setIsLoading] = useState(false);
 
@@ -254,7 +256,12 @@ const Login = () => {
         </div>
         {currentState === 'Login' ? '' : <input onChange={(e)=>setName(e.target.value)} value={name} type="text" className='w-full px-3 py-2 border border-gray-800 outline-none focus:border-indigo-500 transition-colors' placeholder='Name' required/>}
         <input onChange={(e)=>setEmail(e.target.value)} value={email} type="email" className='w-full px-3 py-2 border border-gray-800 outline-none focus:border-indigo-500 transition-colors' placeholder='Email' required/>
-        <input onChange={(e)=>setPasword(e.target.value)} value={password} type="password" className='w-full px-3 py-2 border border-gray-800 outline-none focus:border-indigo-500 transition-colors' placeholder='Password' required/>
+        <div className="relative w-full">
+            <input onChange={(e)=>setPasword(e.target.value)} value={password} type={showPassword ? "text" : "password"} className='w-full px-3 py-2 border border-gray-800 outline-none focus:border-indigo-500 transition-colors pr-10' placeholder='Password' required/>
+            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700">
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+        </div>
         <div className='w-full flex justify-between text-sm mt-[-8px]'>
             <p onClick={() => navigate('/forgot-password')} className='cursor-pointer hover:text-indigo-600 transition-colors'>Forgot your password?</p>
             {
