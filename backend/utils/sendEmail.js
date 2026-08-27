@@ -1,39 +1,43 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
-// Create transporter once and reuse it for faster processing
-let transporter = null;
+// Initialize Resend with the API key from environment variables
+// Make sure to add RESEND_API_KEY to your .env file and Render dashboard
+let resend = null;
 
-const getTransporter = () => {
-    if (!transporter) {
-        transporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
-            port: 587,
-            secure: false, // true for 465, false for other ports (STARTTLS)
-            auth: {
-                user: process.env.SMTP_EMAIL,
-                pass: process.env.SMTP_PASSWORD
-            }
-        });
+const getResendClient = () => {
+    if (!resend && process.env.RESEND_API_KEY) {
+        resend = new Resend(process.env.RESEND_API_KEY);
     }
-    return transporter;
+    return resend;
 };
 
 const sendEmail = async (options) => {
     try {
-        const mailTransporter = getTransporter();
+        const resendClient = getResendClient();
+        
+        if (!resendClient) {
+            console.error("RESEND_API_KEY is not configured.");
+            return false;
+        }
 
-        const mailOptions = {
-            from: process.env.SMTP_EMAIL,
+        const { data, error } = await resendClient.emails.send({
+            // For free Resend tier without a verified domain, you must use onboarding@resend.dev
+            // Once you verify a domain, you can change this to something like 'support@yourdomain.com'
+            from: 'Veloura <onboarding@resend.dev>',
             to: options.to,
             subject: options.subject,
             html: options.html
-        };
+        });
 
-        const info = await mailTransporter.sendMail(mailOptions);
-        console.log("Email sent: " + info.response);
+        if (error) {
+            console.error("Resend API Error:", error);
+            return false;
+        }
+
+        console.log("Email sent successfully via Resend. ID:", data.id);
         return true;
     } catch (error) {
-        console.error("Error sending email:", error);
+        console.error("Error sending email via Resend:", error);
         return false;
     }
 };
