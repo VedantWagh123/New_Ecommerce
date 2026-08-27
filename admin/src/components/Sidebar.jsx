@@ -153,14 +153,14 @@ const Sidebar = ({ role }) => {
   });
 
   return (
-    <aside className='w-[18%] min-w-[70px] md:min-w-[220px] min-h-[calc(100vh-70px)] border-r border-slate-200/90 bg-white/70 backdrop-blur-md pt-6 px-2 sm:px-4 space-y-2 select-none'>
+    <aside className='shrink-0 h-full overflow-y-auto custom-scrollbar w-[18%] min-w-[70px] md:min-w-[220px] border-r border-slate-200/90 bg-white/70 backdrop-blur-md pt-6 px-2 sm:px-4 space-y-2 select-none'>
       <div className='hidden md:block px-3 pb-3 border-b border-slate-100 mb-2'>
         <p className='text-[10px] font-black uppercase tracking-widest text-slate-400'>
           Navigation Menu
         </p>
       </div>
 
-      <nav className='flex flex-col gap-1.5 text-xs sm:text-sm font-medium overflow-y-auto max-h-[70vh] pb-10'>
+      <nav className='flex flex-col gap-1.5 text-xs sm:text-sm font-medium pb-10'>
         {visibleNavItems.map((item) => {
           const IconComponent = item.icon;
           return (

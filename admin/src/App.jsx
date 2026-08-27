@@ -39,15 +39,23 @@ const App = () => {
   }, [token, role])
 
   return (
-    <div className='bg-slate-50 min-h-screen text-slate-900 selection:bg-indigo-500 selection:text-white'>
+    <div className='bg-slate-50 h-screen overflow-hidden text-slate-900 selection:bg-indigo-500 selection:text-white flex flex-col'>
       <ToastContainer position="top-right" autoClose={3000} />
       {token === ""
         ? <Login setToken={setToken} setRole={setRole} />
         : <>
-          <Navbar setToken={setToken} setRole={setRole} role={role} />
-          <div className='flex w-full'>
+          {/* Navbar remains at the top, non-scrolling */}
+          <div className="shrink-0">
+            <Navbar setToken={setToken} setRole={setRole} role={role} />
+          </div>
+          
+          {/* Main flex container takes remaining height */}
+          <div className='flex w-full flex-1 overflow-hidden'>
+            {/* Sidebar component now handles its own styles and scroll */}
             <Sidebar role={role} />
-            <main className='flex-1 w-full text-slate-700 text-base overflow-x-hidden bg-slate-50'>
+
+            {/* Main content area scrolls independently */}
+            <main className='flex-1 h-full overflow-y-auto overflow-x-hidden bg-slate-50 custom-scrollbar'>
               <div className='max-w-[1400px] mx-auto px-4 sm:px-8 py-6 w-full'>
                 <Routes>
                   <Route path='/' element={<Dashboard token={token} />} />
