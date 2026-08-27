@@ -1,10 +1,17 @@
 import userModel from '../models/userModel.js';
 import razorpay from 'razorpay';
 
-const razorpayInstance = new razorpay({
-    key_id : process.env.RAZORPAY_KEY_ID,
-    key_secret : process.env.RAZORPAY_KEY_SECRET,
-});
+let razorpayInstance = null;
+try {
+    if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+        razorpayInstance = new razorpay({
+            key_id : process.env.RAZORPAY_KEY_ID,
+            key_secret : process.env.RAZORPAY_KEY_SECRET,
+        });
+    }
+} catch(err) {
+    console.error("Razorpay initialization error in seller route:", err);
+}
 
 export const onboardRazorpayAccount = async (req, res) => {
     try {
