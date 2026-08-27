@@ -20,6 +20,7 @@ import financeRouter from './routes/financeRoute.js'
 import storyRouter from './routes/storyRoute.js'
 import discoverRouter from './routes/discoverRoute.js'
 import settingsRouter from './routes/settingsRoute.js'
+import newsletterRouter from './routes/newsletterRoute.js'
 
 // App Config
 const app = express()
@@ -52,6 +53,7 @@ app.use('/api/finance',financeRouter)
 app.use('/api/story',storyRouter)
 app.use('/api/discover',discoverRouter)
 app.use('/api/settings',settingsRouter)
+app.use('/api/newsletter',newsletterRouter)
 
 
 app.get('/',(req,res)=>{

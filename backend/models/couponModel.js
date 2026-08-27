@@ -13,7 +13,10 @@ const couponSchema = new mongoose.Schema({
             get: { type: Number, default: 1 }
         }
     },
-    isActive: { type: Boolean, default: true }
+    isActive: { type: Boolean, default: true },
+    isOneTime: { type: Boolean, default: false },
+    isUsed: { type: Boolean, default: false },
+    linkedEmail: { type: String, default: null }
 }, { timestamps: true });
 
 const couponModel = mongoose.models.coupon || mongoose.model('coupon', couponSchema);

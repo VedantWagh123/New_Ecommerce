@@ -4,6 +4,7 @@ import productModel from "../models/productModel.js";
 import Stripe from 'stripe'
 import razorpay from 'razorpay'
 import settingsModel from "../models/settingsModel.js";
+import couponModel from "../models/couponModel.js";
 
 // Helper to attach sellerId and storeName to order items from Product & User collections
 const enrichItemsWithSellerId = async (items) => {
@@ -40,6 +41,19 @@ const enrichItemsWithSellerId = async (items) => {
 // global variables
 const currency = 'inr'
 const deliveryCharge = 10
+
+const markCouponAsUsed = async (couponCode) => {
+    if (!couponCode) return;
+    try {
+        const coupon = await couponModel.findOne({ code: couponCode.toUpperCase() });
+        if (coupon && coupon.isOneTime && !coupon.isUsed) {
+            coupon.isUsed = true;
+            await coupon.save();
+        }
+    } catch(err) {
+        console.error("Error marking coupon as used:", err);
+    }
+};
 
 // gateway initialize
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
@@ -104,6 +118,7 @@ const placeOrder = async (req,res) => {
 
         const newOrder = new orderModel(orderData)
         await newOrder.save()
+        await markCouponAsUsed(couponCode);
 
         await userModel.findByIdAndUpdate(userId,{cartData:{}})
 
@@ -156,6 +171,7 @@ const placeOrderStripe = async (req,res) => {
 
         const newOrder = new orderModel(orderData)
         await newOrder.save()
+        await markCouponAsUsed(couponCode);
 
         const line_items = items.map((item) => ({
             price_data: {
@@ -255,6 +271,7 @@ const placeOrderRazorpay = async (req,res) => {
 
         const newOrder = new orderModel(orderData)
         await newOrder.save()
+        await markCouponAsUsed(couponCode);
 
         // Fetch Global Commission
         let settings = await settingsModel.findOne();

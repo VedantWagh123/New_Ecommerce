@@ -72,6 +72,10 @@ const applyCoupon = async (req, res) => {
             return res.json({ success: false, message: "Invalid or expired coupon code" });
         }
 
+        if (coupon.isOneTime && coupon.isUsed) {
+            return res.json({ success: false, message: "This coupon has already been used and is only valid for one order." });
+        }
+
         // Fetch products in cart
         let totalCartValue = 0;
         let applicableItems = []; // Array of individual item prices that match conditions
