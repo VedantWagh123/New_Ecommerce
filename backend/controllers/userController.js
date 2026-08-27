@@ -24,48 +24,8 @@ const loginUser = async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
 
         if (isMatch) {
-            // Generate OTP logic here
-            const otp = Math.floor(100000 + Math.random() * 900000).toString();
-            const otpHash = await bcrypt.hash(otp, 10);
-            
-            user.otpHash = otpHash;
-            user.otpExpiresAt = Date.now() + 3 * 60 * 1000; // 3 minutes expiration
-            user.otpAttempts = 0;
-            user.otpLastSentAt = Date.now();
-            await user.save();
-
-            const message = `
-            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9fafb; padding: 40px 0; text-align: center;">
-                <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                    <div style="background: linear-gradient(135deg, #111827 0%, #374151 100%); padding: 30px; text-align: center;">
-                        <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700;">Login Verification</h1>
-                    </div>
-                    <div style="padding: 40px 30px; text-align: left;">
-                        <p style="color: #4b5563; font-size: 16px; margin-top: 0;">Hello,</p>
-                        <p style="color: #4b5563; font-size: 16px;">Please use the following 6-digit verification code to complete your login securely.</p>
-                        
-                        <div style="text-align: center; margin: 30px 0; background-color: #f3f4f6; padding: 20px; border-radius: 8px;">
-                            <span style="font-size: 32px; font-weight: 700; color: #111827; letter-spacing: 4px;">${otp}</span>
-                        </div>
-                        
-                        <p style="color: #ef4444; font-size: 14px; font-weight: 600; margin-bottom: 5px;">This code expires in 3 minutes.</p>
-                        <p style="color: #6b7280; font-size: 13px;">If you did not attempt to login, please ignore this email and consider changing your password.</p>
-                    </div>
-                </div>
-            </div>`;
-
-            if (process.env.SMTP_EMAIL && process.env.SMTP_PASSWORD) {
-                await sendEmail({ to: user.email, subject: 'Your Login Verification Code', html: message });
-            } else {
-                console.log("-------------------------------------------------");
-                console.log(`[DEV ONLY] OTP for ${user.email} is: ${otp}`);
-                console.log("-------------------------------------------------");
-            }
-
-            // Generate Temporary Token (Valid for 15 mins, distinct from normal auth token)
-            const tempToken = jwt.sign({ tempUserId: user._id, isOtpPending: true }, process.env.JWT_SECRET, { expiresIn: '15m' });
-
-            res.json({ success: true, message: "OTP sent to your email", otpPending: true, tempToken, email: user.email })
+            const token = createToken(user._id);
+            res.json({ success: true, token })
         }
         else {
             res.json({ success: false, message: 'Invalid credentials' })
