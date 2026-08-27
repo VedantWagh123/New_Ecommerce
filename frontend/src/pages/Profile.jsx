@@ -6,7 +6,7 @@ import { toast } from 'react-toastify'
 import { Camera, Mail, Phone, MapPin, User, ArrowRight, ShieldCheck, Clock, XCircle, Store } from 'lucide-react'
 
 const Profile = () => {
-    const { token, sellerStatus, backendUrl } = useContext(ShopContext);
+    const { token, sellerStatus, backendUrl, fetchSellerStatus } = useContext(ShopContext);
 
     const [formData, setFormData] = useState({
         firstName: '',
@@ -163,7 +163,8 @@ const Profile = () => {
             if (response.data.success) {
                 toast.success(response.data.message);
                 setShowSellerModal(false);
-                fetchUserProfile(); // This will pull the updated sellerStatus
+                fetchUserProfile(); 
+                fetchSellerStatus(token); // Update context to instantly reflect 'pending'
             } else {
                 toast.error(response.data.message);
             }
