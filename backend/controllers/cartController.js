@@ -7,29 +7,9 @@ const addToCart = async (req,res) => {
         
         const { userId, itemId, size } = req.body
 
-        const userData = await userModel.findById(userId)
-        if (!userData) {
-            return res.json({ success: false, message: "User not found" })
-        }
-
-        let cartData = (await userData.cartData) || {};
-
-        if (cartData[itemId]) {
-            if (cartData[itemId][size]) {
-                cartData[itemId][size] += 1
-            }
-            else {
-                cartData[itemId][size] = 1
-            }
-        } else {
-            cartData[itemId] = {}
-            cartData[itemId][size] = 1
-        }
-
-        await userModel.findByIdAndUpdate(userId, { 
-            cartData, 
-            cartUpdatedAt: Date.now(), 
-            abandonedMailSent: false 
+        await userModel.findByIdAndUpdate(userId, {
+            $inc: { [`cartData.${itemId}.${size}`]: 1 },
+            $set: { cartUpdatedAt: Date.now(), abandonedMailSent: false }
         })
 
         res.json({ success: true, message: "Added To Cart" })
@@ -46,20 +26,12 @@ const updateCart = async (req,res) => {
         
         const { userId ,itemId, size, quantity } = req.body
 
-        const userData = await userModel.findById(userId)
-        if (!userData) {
-            return res.json({ success: false, message: "User not found" })
-        }
-
-        let cartData = (await userData.cartData) || {};
-
-        if (!cartData[itemId]) cartData[itemId] = {};
-        cartData[itemId][size] = quantity
-
         await userModel.findByIdAndUpdate(userId, { 
-            cartData, 
-            cartUpdatedAt: Date.now(), 
-            abandonedMailSent: false 
+            $set: { 
+                [`cartData.${itemId}.${size}`]: quantity,
+                cartUpdatedAt: Date.now(), 
+                abandonedMailSent: false 
+            }
         })
         res.json({ success: true, message: "Cart Updated" })
 

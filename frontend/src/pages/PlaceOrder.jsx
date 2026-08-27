@@ -22,7 +22,8 @@ const PlaceOrder = () => {
         products, 
         currency,
         getCartCount,
-        karmaScore
+        karmaScore,
+        getCartTotals
     } = useContext(ShopContext);
 
     const { subtotal, finalTotal, deliveryFee, couponCode, couponDiscountAmount } = getCartTotals();
