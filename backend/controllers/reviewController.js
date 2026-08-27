@@ -7,7 +7,7 @@ import { v2 as cloudinary } from "cloudinary";
 // Helper function to update product rating aggregates
 const updateProductRatingStats = async (productId) => {
   try {
-    const activeReviews = await reviewModel.find({ productId, hidden: false });
+    const activeReviews = await reviewModel.find({ productId, status: 'approved' });
     const totalReviews = activeReviews.length;
     let averageRating = 0;
 
@@ -28,7 +28,8 @@ const updateProductRatingStats = async (productId) => {
 // Add Review Controller
 const addReview = async (req, res) => {
   try {
-    const { userId, productId, orderId, rating, title, comment, attributes } = req.body;
+    const userId = req.body.userId || req.userId;
+    const { productId, orderId, rating, title, comment, attributes } = req.body;
 
     if (!productId || !orderId || !rating || !comment) {
       return res.json({ success: false, message: "Please fill all required review fields." });
@@ -63,7 +64,7 @@ const addReview = async (req, res) => {
       return res.json({ success: false, message: "You have already reviewed this product for this order." });
     }
 
-    // 6. Handle Review Photos upload (if uploaded via req.files)
+    // 6. Handle Review Photos upload
     let imagesUrl = [];
     if (req.files && Array.isArray(req.files) && req.files.length > 0) {
       cloudinary.config({
@@ -103,28 +104,117 @@ const addReview = async (req, res) => {
       images: imagesUrl,
       attributes: parsedAttributes,
       verifiedPurchase: true,
-      hidden: false,
+      status: 'pending', // Requires admin approval
       date: Date.now()
     };
 
     const newReview = new reviewModel(reviewData);
     await newReview.save();
 
-    // 8. Update Product Rating Aggregates
+    // 8. Update Product Rating Aggregates (won't affect until approved, but good practice)
     await updateProductRatingStats(productId);
 
-    res.json({ success: true, message: "Thank you! Your review has been submitted." });
+    res.json({ success: true, message: "Your review has been submitted and is pending approval." });
   } catch (error) {
     console.error("Add Review Error:", error);
     res.json({ success: false, message: error.message });
   }
 };
 
-// Get Product Reviews Controller
+// Update User Review
+const updateUserReview = async (req, res) => {
+  try {
+    const userId = req.body.userId || req.userId;
+    const { reviewId, rating, title, comment, attributes, existingImages } = req.body;
+
+    const review = await reviewModel.findOne({ _id: reviewId, userId });
+    if (!review) {
+      return res.json({ success: false, message: "Review not found or unauthorized." });
+    }
+
+    let imagesUrl = existingImages ? (typeof existingImages === 'string' ? [existingImages] : existingImages) : [];
+    
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_SECRET_KEY
+      });
+      const newImagesUrl = await Promise.all(
+        req.files.map(async (file) => {
+          let result = await cloudinary.uploader.upload(file.path, { resource_type: 'image' });
+          return result.secure_url;
+        })
+      );
+      imagesUrl = [...imagesUrl, ...newImagesUrl];
+    }
+
+    let parsedAttributes = review.attributes || { fit: 5, quality: 5, comfort: 5, material: 5, colorAccuracy: 5 };
+    if (attributes) {
+      try {
+        const obj = typeof attributes === 'string' ? JSON.parse(attributes) : attributes;
+        parsedAttributes = { ...parsedAttributes, ...obj };
+      } catch (e) {}
+    }
+
+    review.rating = Number(rating) || review.rating;
+    review.title = title !== undefined ? title : review.title;
+    review.comment = comment || review.comment;
+    review.attributes = parsedAttributes;
+    review.images = imagesUrl;
+    review.status = 'pending'; // Re-submit for approval
+    review.date = Date.now();
+
+    await review.save();
+    await updateProductRatingStats(review.productId);
+
+    res.json({ success: true, message: "Review updated and is pending approval." });
+  } catch (error) {
+    console.error(error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// Delete User Review
+const deleteUserReview = async (req, res) => {
+  try {
+    const { userId, reviewId } = req.body;
+    const review = await reviewModel.findOne({ _id: reviewId, userId });
+    
+    if (!review) {
+      return res.json({ success: false, message: "Review not found or unauthorized." });
+    }
+
+    await reviewModel.findByIdAndDelete(reviewId);
+    await updateProductRatingStats(review.productId);
+
+    res.json({ success: true, message: "Review deleted successfully." });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// Get a single review for a user (used for editing)
+const getSingleUserReview = async (req, res) => {
+  try {
+    const { userId, productId, orderId } = req.body;
+    const review = await reviewModel.findOne({ userId, productId, orderId });
+    
+    if (!review) {
+      return res.json({ success: false, message: "Review not found." });
+    }
+    res.json({ success: true, review });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// Get Product Reviews Controller (Public)
 const getProductReviews = async (req, res) => {
   try {
     const { productId } = req.params;
-    const reviews = await reviewModel.find({ productId, hidden: false }).sort({ date: -1 });
+    // Only fetch approved reviews for public view
+    const reviews = await reviewModel.find({ productId, status: 'approved' }).sort({ date: -1 });
 
     const totalReviews = reviews.length;
     let sumRating = 0;
@@ -194,16 +284,20 @@ const adminGetAllReviews = async (req, res) => {
   }
 };
 
-// Admin: Toggle Hide/Show Review
-const adminToggleHideReview = async (req, res) => {
+// Admin: Update Review Status
+const adminUpdateReviewStatus = async (req, res) => {
   try {
-    const { reviewId } = req.body;
+    const { reviewId, status } = req.body;
     const review = await reviewModel.findById(reviewId);
     if (!review) {
       return res.json({ success: false, message: "Review not found" });
     }
 
-    review.hidden = !review.hidden;
+    if (!['pending', 'approved', 'rejected'].includes(status)) {
+      return res.json({ success: false, message: "Invalid status" });
+    }
+
+    review.status = status;
     await review.save();
 
     // Recalculate product rating aggregates
@@ -211,9 +305,27 @@ const adminToggleHideReview = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Review ${review.hidden ? 'hidden' : 'unhidden'} successfully.`,
-      hidden: review.hidden
+      message: `Review status updated to ${status}.`,
+      status: review.status
     });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// Admin: Delete Review
+const adminDeleteReview = async (req, res) => {
+  try {
+    const { reviewId } = req.body;
+    const review = await reviewModel.findById(reviewId);
+    if (!review) {
+      return res.json({ success: false, message: "Review not found" });
+    }
+
+    await reviewModel.findByIdAndDelete(reviewId);
+    await updateProductRatingStats(review.productId);
+
+    res.json({ success: true, message: "Review deleted successfully." });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -221,8 +333,12 @@ const adminToggleHideReview = async (req, res) => {
 
 export {
   addReview,
+  updateUserReview,
+  deleteUserReview,
+  getSingleUserReview,
   getProductReviews,
   getUserEligibleReviews,
   adminGetAllReviews,
-  adminToggleHideReview
+  adminUpdateReviewStatus,
+  adminDeleteReview
 };

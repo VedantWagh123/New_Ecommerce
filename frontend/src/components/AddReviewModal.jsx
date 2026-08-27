@@ -1,36 +1,118 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
-const AddReviewModal = ({ isOpen, onClose, product, orderId, backendUrl, token, onReviewSubmitted }) => {
-  const [rating, setRating] = useState(5);
+const AddReviewModal = ({ isOpen, onClose, product, orderId, mode = 'add', backendUrl, token, onReviewSubmitted }) => {
+  const [reviewId, setReviewId] = useState(null);
+  const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
   const [attributes, setAttributes] = useState({
-    fit: 5,
-    quality: 5,
-    comfort: 5,
-    material: 5,
-    colorAccuracy: 5
+    fit: 0,
+    quality: 0,
+    comfort: 0,
+    material: 0,
+    colorAccuracy: 0
   });
+  
+  // Hover states for attributes
+  const [hoverAttributes, setHoverAttributes] = useState({
+    fit: 0,
+    quality: 0,
+    comfort: 0,
+    material: 0,
+    colorAccuracy: 0
+  });
+
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [existingImages, setExistingImages] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && product && mode === 'edit') {
+      fetchExistingReview();
+    } else if (isOpen && mode === 'add') {
+      resetForm();
+    }
+  }, [isOpen, product, mode]);
+
+  const resetForm = () => {
+    setReviewId(null);
+    setRating(0);
+    setHoverRating(0);
+    setTitle('');
+    setComment('');
+    setAttributes({ fit: 0, quality: 0, comfort: 0, material: 0, colorAccuracy: 0 });
+    setHoverAttributes({ fit: 0, quality: 0, comfort: 0, material: 0, colorAccuracy: 0 });
+    setSelectedFiles([]);
+    setExistingImages([]);
+  };
+
+  const fetchExistingReview = async () => {
+    try {
+      setLoadingData(true);
+      const res = await axios.post(
+        `${backendUrl}/api/review/user-review`,
+        { productId: product._id || product.id, orderId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data.success && res.data.review) {
+        const rev = res.data.review;
+        setReviewId(rev._id);
+        setRating(rev.rating);
+        setTitle(rev.title || '');
+        setComment(rev.comment);
+        if (rev.attributes) {
+          setAttributes(rev.attributes);
+        }
+        setExistingImages(rev.images || []);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load review data.");
+    } finally {
+      setLoadingData(false);
+    }
+  };
 
   if (!isOpen || !product) return null;
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
-    if (files.length > 4) {
-      toast.warning("You can upload a maximum of 4 photos.");
-      setSelectedFiles(files.slice(0, 4));
+    const totalCurrentPhotos = existingImages.length + files.length;
+    if (totalCurrentPhotos > 4) {
+      toast.warning("You can upload a maximum of 4 photos combined.");
+      setSelectedFiles(files.slice(0, Math.max(0, 4 - existingImages.length)));
     } else {
       setSelectedFiles(files);
     }
   };
 
+  const removeExistingImage = (index) => {
+    setExistingImages(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  const removeNewImage = (index) => {
+      const dt = new DataTransfer();
+      const updatedFiles = selectedFiles.filter((_, i) => i !== index);
+      updatedFiles.forEach(file => dt.items.add(file));
+      setSelectedFiles(updatedFiles);
+      
+      const inputElement = document.getElementById('review-image-upload');
+      if (inputElement) {
+          inputElement.files = dt.files;
+      }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (rating === 0) {
+      toast.error("Please provide an overall rating.");
+      return;
+    }
     if (!comment.trim()) {
       toast.error("Please write a brief comment for your review.");
       return;
@@ -46,12 +128,18 @@ const AddReviewModal = ({ isOpen, onClose, product, orderId, backendUrl, token, 
       formData.append("comment", comment);
       formData.append("attributes", JSON.stringify(attributes));
 
+      if (mode === 'edit') {
+        formData.append("reviewId", reviewId);
+        existingImages.forEach(img => formData.append("existingImages", img));
+      }
+
       selectedFiles.forEach((file) => {
         formData.append("images", file);
       });
 
+      const endpoint = mode === 'edit' ? '/api/review/update' : '/api/review/add';
       const response = await axios.post(
-        `${backendUrl}/api/review/add`,
+        `${backendUrl}${endpoint}`,
         formData,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -71,156 +159,259 @@ const AddReviewModal = ({ isOpen, onClose, product, orderId, backendUrl, token, 
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete your review?")) return;
+    try {
+      setDeleting(true);
+      const res = await axios.delete(`${backendUrl}/api/review/delete`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { reviewId }
+      });
+      if (res.data.success) {
+        toast.success(res.data.message);
+        onReviewSubmitted && onReviewSubmitted();
+        onClose();
+      } else {
+        toast.error(res.data.message);
+      }
+    } catch (error) {
+      toast.error("Failed to delete review.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Custom Star SVG for better visuals
+  const StarIcon = ({ filled, className = "w-7 h-7" }) => (
+    <svg 
+      className={`${className} transition-all duration-200 ${filled ? 'text-amber-400 fill-amber-400' : 'text-gray-300 fill-gray-100'} drop-shadow-sm`} 
+      viewBox="0 0 24 24" 
+      stroke="currentColor" 
+      strokeWidth="1.5"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+    </svg>
+  );
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div
-        className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl border border-gray-100 relative text-gray-900"
+        className="bg-white rounded-3xl max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-gray-100 relative text-gray-900 scrollbar-hide"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-900 w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-900 w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors z-10"
         >
           ✕
         </button>
 
-        {/* Modal Header */}
-        <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
-          <img
-            src={product.image?.[0] || product.image}
-            alt={product.name}
-            className="w-14 h-16 object-cover rounded-lg border border-gray-200 bg-gray-50"
-          />
-          <div>
-            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-              Verified Purchase Review
-            </span>
-            <h3 className="font-bold text-sm sm:text-base text-gray-900 line-clamp-1 mt-0.5">
-              {product.name}
-            </h3>
-            <p className="text-xs text-gray-500 font-light">Order ID: #{orderId?.slice(-8)?.toUpperCase()}</p>
+        {/* Header Section */}
+        <div className="sticky top-0 bg-white/90 backdrop-blur-md z-[5] px-6 py-5 border-b border-gray-100 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-20 shrink-0 bg-gray-50 rounded-xl overflow-hidden border border-gray-100 shadow-sm">
+              <img
+                src={product.image?.[0] || product.image}
+                alt={product.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div>
+              <span className="inline-flex items-center gap-1.5 text-[10px] bg-emerald-50 border border-emerald-200 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider mb-1.5">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                {mode === 'edit' ? 'Edit Verified Review' : 'Verified Purchase'}
+              </span>
+              <h3 className="font-bold text-base text-gray-900 line-clamp-1">
+                {product.name}
+              </h3>
+              <p className="text-xs text-gray-500 font-medium mt-0.5">Order ID: <span className="font-mono text-gray-700">#{orderId?.slice(-8)?.toUpperCase()}</span></p>
+            </div>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs sm:text-sm">
-          {/* Overall Star Rating */}
-          <div>
-            <label className="block font-bold text-gray-800 mb-1">Overall Rating *</label>
-            <div className="flex items-center gap-1.5">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  type="button"
-                  key={star}
-                  onClick={() => setRating(star)}
-                  onMouseEnter={() => setHoverRating(star)}
-                  onMouseLeave={() => setHoverRating(0)}
-                  className="text-2xl transition-transform hover:scale-125 focus:outline-none"
-                >
-                  <span className={(hoverRating || rating) >= star ? "text-amber-400" : "text-gray-200"}>
-                    ★
-                  </span>
-                </button>
-              ))}
-              <span className="ml-2 font-semibold text-xs text-gray-600">
-                {rating === 5 ? 'Excellent ⭐⭐⭐⭐⭐' :
-                 rating === 4 ? 'Very Good ⭐⭐⭐⭐' :
-                 rating === 3 ? 'Good ⭐⭐⭐' :
-                 rating === 2 ? 'Fair ⭐⭐' : 'Poor ⭐'}
-              </span>
+        <div className="p-6">
+            {loadingData ? (
+            <div className="flex flex-col items-center justify-center py-12">
+                <div className="w-10 h-10 border-4 border-gray-100 border-t-amber-400 rounded-full animate-spin"></div>
+                <p className="text-sm text-gray-500 mt-4 font-medium animate-pulse">Loading your review...</p>
             </div>
-          </div>
-
-          {/* Attribute Ratings */}
-          <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200/80 space-y-2.5">
-            <p className="font-bold text-xs uppercase tracking-wider text-gray-700">Rate Product Attributes</p>
-            {[
-              { key: 'fit', label: 'Fit & Sizing' },
-              { key: 'quality', label: 'Fabric & Quality' },
-              { key: 'comfort', label: 'Wearing Comfort' },
-              { key: 'material', label: 'Material Softness' },
-              { key: 'colorAccuracy', label: 'Color Accuracy' }
-            ].map(({ key, label }) => (
-              <div key={key} className="flex items-center justify-between">
-                <span className="text-xs text-gray-700 font-medium">{label}</span>
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map((val) => (
-                    <button
-                      type="button"
-                      key={val}
-                      onClick={() => setAttributes(prev => ({ ...prev, [key]: val }))}
-                      className={`w-6 h-6 text-[10px] rounded-md font-bold transition-all ${
-                        attributes[key] >= val ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                      }`}
-                    >
-                      {val}
-                    </button>
-                  ))}
+            ) : (
+            <form onSubmit={handleSubmit} className="space-y-7">
+                
+                {/* Overall Star Rating */}
+                <div className="flex flex-col items-center bg-amber-50/50 p-5 rounded-2xl border border-amber-100/50">
+                    <label className="block font-bold text-gray-900 text-base mb-3">How would you rate this product?</label>
+                    <div className="flex items-center gap-2 mb-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                            type="button"
+                            key={star}
+                            onClick={() => setRating(star)}
+                            onMouseEnter={() => setHoverRating(star)}
+                            onMouseLeave={() => setHoverRating(0)}
+                            className="transition-transform hover:scale-110 focus:outline-none"
+                        >
+                            <StarIcon filled={(hoverRating || rating) >= star} className="w-10 h-10" />
+                        </button>
+                        ))}
+                    </div>
+                    {rating > 0 && (
+                      <span className="font-bold text-sm text-amber-700 bg-amber-100 px-3 py-1 rounded-full">
+                          {rating === 5 ? 'Excellent' :
+                          rating === 4 ? 'Very Good' :
+                          rating === 3 ? 'Good' :
+                          rating === 2 ? 'Fair' : 'Poor'}
+                      </span>
+                    )}
                 </div>
-              </div>
-            ))}
-          </div>
 
-          {/* Review Title */}
-          <div>
-            <label className="block font-bold text-gray-800 mb-1">Headline / Title (Optional)</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Summarize your experience (e.g. Perfectly fitted & super comfortable!)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl outline-none focus:border-black text-xs sm:text-sm"
-            />
-          </div>
+                {/* Attribute Ratings with Stars */}
+                <div>
+                    <label className="block font-bold text-gray-900 mb-3 text-sm">Detailed Ratings</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
+                        {[
+                            { key: 'fit', label: 'Fit & Sizing' },
+                            { key: 'quality', label: 'Fabric & Quality' },
+                            { key: 'comfort', label: 'Wearing Comfort' },
+                            { key: 'material', label: 'Material Softness' },
+                            { key: 'colorAccuracy', label: 'Color Accuracy' }
+                        ].map(({ key, label }) => (
+                            <div key={key} className="flex items-center justify-between">
+                            <span className="text-xs text-gray-700 font-semibold">{label}</span>
+                            <div className="flex gap-0.5">
+                                {[1, 2, 3, 4, 5].map((val) => (
+                                <button
+                                    type="button"
+                                    key={val}
+                                    onClick={() => setAttributes(prev => ({ ...prev, [key]: val }))}
+                                    onMouseEnter={() => setHoverAttributes(prev => ({...prev, [key]: val}))}
+                                    onMouseLeave={() => setHoverAttributes(prev => ({...prev, [key]: 0}))}
+                                    className="focus:outline-none transition-transform hover:scale-110"
+                                >
+                                    <StarIcon 
+                                        filled={(hoverAttributes[key] || attributes[key]) >= val} 
+                                        className="w-4 h-4" 
+                                    />
+                                </button>
+                                ))}
+                            </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
 
-          {/* Detailed Comment */}
-          <div>
-            <label className="block font-bold text-gray-800 mb-1">Written Review *</label>
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              required
-              rows={3}
-              placeholder="What did you like or dislike about the fabric, fit, or stitching?"
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl outline-none focus:border-black text-xs sm:text-sm"
-            />
-          </div>
+                <div className="space-y-4">
+                    {/* Review Title */}
+                    <div>
+                    <label className="block font-bold text-gray-900 mb-2 text-sm">Review Headline <span className="text-gray-400 font-normal text-xs">(Optional)</span></label>
+                    <input
+                        type="text"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder="Summarize your experience (e.g. Perfect fit!)"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-400/10 transition-all text-sm"
+                    />
+                    </div>
 
-          {/* Photo Upload */}
-          <div>
-            <label className="block font-bold text-gray-800 mb-1">Add Product Photos (Optional, max 4)</label>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleFileChange}
-              className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-gray-900 file:text-white hover:file:bg-black"
-            />
-            {selectedFiles.length > 0 && (
-              <p className="text-[11px] text-emerald-600 font-medium mt-1">
-                ✓ {selectedFiles.length} photo(s) selected
-              </p>
+                    {/* Detailed Comment */}
+                    <div>
+                    <label className="block font-bold text-gray-900 mb-2 text-sm">Written Review <span className="text-rose-500">*</span></label>
+                    <textarea
+                        value={comment}
+                        onChange={(e) => setComment(e.target.value)}
+                        required
+                        rows={4}
+                        placeholder="What did you like or dislike about the fabric, fit, or stitching?"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-400/10 transition-all text-sm resize-none"
+                    />
+                    </div>
+                </div>
+
+                {/* Photo Upload */}
+                <div>
+                <label className="block font-bold text-gray-900 mb-2 text-sm">Add Photos <span className="text-gray-400 font-normal text-xs">(Max 4)</span></label>
+                
+                <div className="flex flex-wrap gap-3 mb-3">
+                    {/* Existing Images */}
+                    {existingImages.map((img, idx) => (
+                        <div key={`exist-${idx}`} className="relative group">
+                        <img src={img} alt="Existing" className="w-20 h-20 object-cover rounded-xl border border-gray-200 shadow-sm" />
+                        <button type="button" onClick={() => removeExistingImage(idx)} className="absolute -top-2 -right-2 bg-white text-rose-500 hover:text-white hover:bg-rose-500 border border-rose-100 rounded-full w-6 h-6 flex items-center justify-center transition-colors shadow-sm">✕</button>
+                        </div>
+                    ))}
+                    
+                    {/* New Images */}
+                    {selectedFiles.map((file, idx) => (
+                        <div key={`new-${idx}`} className="relative group">
+                        <img src={URL.createObjectURL(file)} alt="New upload" className="w-20 h-20 object-cover rounded-xl border border-gray-200 shadow-sm" />
+                        <button type="button" onClick={() => removeNewImage(idx)} className="absolute -top-2 -right-2 bg-white text-rose-500 hover:text-white hover:bg-rose-500 border border-rose-100 rounded-full w-6 h-6 flex items-center justify-center transition-colors shadow-sm">✕</button>
+                        </div>
+                    ))}
+
+                    {/* Upload Button */}
+                    {(existingImages.length + selectedFiles.length) < 4 && (
+                        <label 
+                            htmlFor="review-image-upload" 
+                            className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-gray-500 hover:text-amber-500 hover:border-amber-300 hover:bg-amber-50/50 cursor-pointer transition-all"
+                        >
+                            <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                            <span className="text-[10px] font-semibold">Upload</span>
+                        </label>
+                    )}
+                </div>
+
+                <input
+                    id="review-image-upload"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileChange}
+                    className="hidden"
+                    disabled={existingImages.length + selectedFiles.length >= 4}
+                />
+                </div>
+
+                {/* Submit CTAs */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-4 mt-6 border-t border-gray-100">
+                {mode === 'edit' && (
+                    <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={deleting || submitting}
+                    className="w-full sm:w-auto px-6 py-3.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 rounded-xl font-bold transition-all text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                    {deleting ? (
+                        <div className="w-4 h-4 border-2 border-rose-600 border-t-transparent rounded-full animate-spin"></div>
+                    ) : 'Delete Review'}
+                    </button>
+                )}
+                <div className="flex flex-1 gap-3 w-full">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={submitting || deleting}
+                        className="flex-1 sm:flex-none sm:w-32 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-bold transition-colors text-sm disabled:opacity-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={submitting || deleting}
+                        className="flex-1 py-3.5 bg-black hover:bg-gray-900 disabled:bg-gray-400 text-white rounded-xl font-bold transition-all text-sm shadow-md active:scale-[0.98] flex items-center justify-center gap-2"
+                    >
+                        {submitting ? (
+                            <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                <span>Submitting...</span>
+                            </>
+                        ) : mode === 'edit' ? 'Update Review' : 'Submit Review'}
+                    </button>
+                </div>
+                </div>
+            </form>
             )}
-          </div>
-
-          {/* Submit CTAs */}
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-bold transition-colors text-xs uppercase"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex-1 py-2.5 bg-gray-900 hover:bg-black disabled:bg-gray-400 text-white rounded-xl font-bold transition-all text-xs uppercase shadow-md active:scale-98"
-            >
-              {submitting ? 'Submitting...' : 'Submit Review'}
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   );

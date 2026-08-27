@@ -17,7 +17,8 @@ const Orders = () => {
   const [reviewModalState, setReviewModalState] = useState({
     isOpen: false,
     product: null,
-    orderId: null
+    orderId: null,
+    mode: 'add'
   });
   const [reviewedKeys, setReviewedKeys] = useState([]);
 
@@ -164,12 +165,15 @@ const Orders = () => {
                           {/* Write Review CTA for Delivered Order Items */}
                           {isDelivered && (
                             isAlreadyReviewed ? (
-                              <span className='text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg flex items-center gap-1'>
-                                ✓ Reviewed
-                              </span>
+                              <button
+                                onClick={() => setReviewModalState({ isOpen: true, product: item, orderId: order._id, mode: 'edit' })}
+                                className='text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all active:scale-95'
+                              >
+                                <span>⭐ Edit Review</span>
+                              </button>
                             ) : (
                               <button
-                                onClick={() => setReviewModalState({ isOpen: true, product: item, orderId: order._id })}
+                                onClick={() => setReviewModalState({ isOpen: true, product: item, orderId: order._id, mode: 'add' })}
                                 className='text-xs font-bold bg-amber-400 hover:bg-amber-500 text-gray-900 px-3.5 py-1.5 rounded-lg transition-all shadow-2xs flex items-center gap-1.5 active:scale-95'
                               >
                                 <span>⭐ Write Review</span>
@@ -246,9 +250,10 @@ const Orders = () => {
       {/* Add Review Modal */}
       <AddReviewModal
         isOpen={reviewModalState.isOpen}
-        onClose={() => setReviewModalState({ isOpen: false, product: null, orderId: null })}
+        onClose={() => setReviewModalState({ isOpen: false, product: null, orderId: null, mode: 'add' })}
         product={reviewModalState.product}
         orderId={reviewModalState.orderId}
+        mode={reviewModalState.mode}
         backendUrl={backendUrl}
         token={token}
         onReviewSubmitted={loadOrderData}

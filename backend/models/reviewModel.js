@@ -17,7 +17,7 @@ const reviewSchema = new mongoose.Schema({
     colorAccuracy: { type: Number, default: 5 } // 1-5
   },
   verifiedPurchase: { type: Boolean, default: true },
-  hidden: { type: Boolean, default: false },
+  status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
   date: { type: Number, required: true }
 });
 
