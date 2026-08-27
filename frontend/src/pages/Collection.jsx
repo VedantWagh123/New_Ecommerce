@@ -129,7 +129,7 @@ const Collection = () => {
     <div className='flex flex-col sm:flex-row gap-1 sm:gap-10 pt-10 border-t min-h-[60vh]'>
       
       {/* Filter Options Sidebar */}
-      <div className='min-w-60'>
+      <div className='min-w-60 sm:sticky sm:top-24 self-start'>
         <p onClick={() => setShowFilter(!showFilter)} className='my-2 text-xl flex items-center cursor-pointer gap-2 font-medium'>
           FILTERS
           <img className={`h-3 sm:hidden ${showFilter ? 'rotate-90' : ''}`} src={assets.dropdown_icon} alt="" />

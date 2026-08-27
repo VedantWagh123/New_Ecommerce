@@ -35,7 +35,7 @@ const ScrollToTop = () => {
 
 const App = () => {
   return (
-    <div className='px-2 sm:px-[5vw] md:px-[7vw] lg:px-[9vw] min-h-screen flex flex-col justify-between relative overflow-x-hidden'>
+    <div className='px-2 sm:px-[5vw] md:px-[7vw] lg:px-[9vw] min-h-screen flex flex-col justify-between relative'>
       <ScrollToTop />
       <div>
         <ToastContainer />

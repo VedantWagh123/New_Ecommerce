@@ -17,6 +17,10 @@ html {
     font-size: 120%; 
 }
 
+body {
+    overflow-x: hidden;
+}
+
 .prata-regular {
     font-family: "Prata", serif;
     font-weight: 400;
