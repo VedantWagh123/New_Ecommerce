@@ -25,9 +25,18 @@ import SellerRegisterRedirect from './pages/SellerRegisterRedirect'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+};
+
 const App = () => {
   return (
     <div className='px-2 sm:px-[5vw] md:px-[7vw] lg:px-[9vw] min-h-screen flex flex-col justify-between relative overflow-x-hidden'>
+      <ScrollToTop />
       <div>
         <ToastContainer />
         <Navbar />

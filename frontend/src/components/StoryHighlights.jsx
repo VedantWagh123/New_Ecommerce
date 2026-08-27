@@ -77,7 +77,17 @@ const StoryHighlights = () => {
     const handleActionClick = (link, e) => {
         e.stopPropagation();
         closeStory();
-        navigate(link || '/collection');
+        if (link && link !== '/collection') {
+            if (link.startsWith('http')) {
+                window.location.href = link;
+            } else if (link.startsWith('/')) {
+                navigate(link);
+            } else {
+                navigate(`/product/${link}`);
+            }
+        } else {
+            navigate('/collection');
+        }
     };
 
     if (stories.length === 0) return null;

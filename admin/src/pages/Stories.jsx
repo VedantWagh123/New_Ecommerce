@@ -128,7 +128,7 @@ const Stories = ({ token }) => {
                         </div>
 
                         <div>
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Redirect Link (Optional)</p>
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Product ID or Redirect Link</p>
                             <div className="relative">
                                 <LinkIcon className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
                                 <input 
@@ -136,9 +136,12 @@ const Stories = ({ token }) => {
                                     value={link} 
                                     className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors text-sm font-medium" 
                                     type="text" 
-                                    placeholder="/collection?category=Men" 
+                                    placeholder="e.g., 66b328a9b3a... (Product ID)" 
                                 />
                             </div>
+                            <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+                                💡 <b>How to link a specific product:</b> Open your website, go to the product page, and copy the ID from the URL (e.g., if URL is <code>/product/66b3...</code>, paste <code>66b3...</code> here). If left blank, it redirects to the Collection page.
+                            </p>
                         </div>
 
                         <button 
