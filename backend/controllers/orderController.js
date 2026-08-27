@@ -44,10 +44,19 @@ const deliveryCharge = 10
 // gateway initialize
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
-const razorpayInstance = new razorpay({
-    key_id : process.env.RAZORPAY_KEY_ID,
-    key_secret : process.env.RAZORPAY_KEY_SECRET,
-})
+let razorpayInstance = null;
+try {
+    if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+        razorpayInstance = new razorpay({
+            key_id : process.env.RAZORPAY_KEY_ID,
+            key_secret : process.env.RAZORPAY_KEY_SECRET,
+        });
+    } else {
+        console.warn("Razorpay keys missing. Razorpay payments will be disabled.");
+    }
+} catch(err) {
+    console.error("Razorpay initialization error:", err);
+}
 
 // Placing orders using COD Method
 const placeOrder = async (req,res) => {
