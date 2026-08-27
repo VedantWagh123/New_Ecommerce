@@ -10,7 +10,7 @@ const Navbar = ({ setToken, setRole, role }) => {
     return 'Admin';
   }
   return (
-    <header className='sticky top-0 z-40 w-full bg-white/80 backdrop-blur-lg border-b border-slate-200/80 px-[4%] py-3 flex items-center justify-between shadow-2xs transition-all'>
+    <header className='w-full bg-white border-b border-slate-200/80 px-[4%] py-3 flex items-center justify-between shadow-2xs transition-all'>
       <div className='flex items-center gap-3'>
         <img className='w-24 sm:w-32 object-contain' src={assets.logo} alt="Store Logo" />
         <span className='hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-slate-900 text-white border border-slate-800 shadow-xs'>
