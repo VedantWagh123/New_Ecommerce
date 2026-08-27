@@ -32,11 +32,19 @@ const AddReviewModal = ({ isOpen, onClose, product, orderId, mode = 'add', backe
   const [loadingData, setLoadingData] = useState(false);
 
   useEffect(() => {
-    if (isOpen && product && mode === 'edit') {
-      fetchExistingReview();
-    } else if (isOpen && mode === 'add') {
-      resetForm();
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      if (product && mode === 'edit') {
+        fetchExistingReview();
+      } else if (mode === 'add') {
+        resetForm();
+      }
+    } else {
+      document.body.style.overflow = 'unset';
     }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
   }, [isOpen, product, mode]);
 
   const resetForm = () => {
@@ -194,21 +202,21 @@ const AddReviewModal = ({ isOpen, onClose, product, orderId, mode = 'add', backe
   );
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div
-        className="bg-white rounded-3xl max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-gray-100 relative text-gray-900 scrollbar-hide"
+        className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full max-h-[90dvh] flex flex-col shadow-2xl relative text-gray-900"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-900 w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors z-10"
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-900 w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors z-20"
         >
           ✕
         </button>
 
-        {/* Header Section */}
-        <div className="sticky top-0 bg-white/90 backdrop-blur-md z-[5] px-6 py-5 border-b border-gray-100 shadow-sm">
+        {/* Header Section (Fixed at top) */}
+        <div className="shrink-0 bg-white z-[5] px-5 sm:px-6 py-4 border-b border-gray-100 shadow-sm rounded-t-3xl">
           <div className="flex items-center gap-4">
             <div className="w-16 h-20 shrink-0 bg-gray-50 rounded-xl overflow-hidden border border-gray-100 shadow-sm">
               <img
@@ -230,7 +238,8 @@ const AddReviewModal = ({ isOpen, onClose, product, orderId, mode = 'add', backe
           </div>
         </div>
 
-        <div className="p-6">
+        {/* Scrollable Body Section */}
+        <div className="p-5 sm:p-6 overflow-y-auto flex-1 scrollbar-hide">
             {loadingData ? (
             <div className="flex flex-col items-center justify-center py-12">
                 <div className="w-10 h-10 border-4 border-gray-100 border-t-amber-400 rounded-full animate-spin"></div>
