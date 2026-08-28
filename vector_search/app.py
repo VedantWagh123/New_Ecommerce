@@ -12,6 +12,11 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 
 app = FastAPI(title="Fashion Visual Search API")
 
+import torch
+# Optimize PyTorch memory for 512MB RAM constraints (Render Free Tier)
+torch.set_num_threads(1)
+os.environ["MALLOC_ARENA_MAX"] = "2"
+
 # Initialize Model (CLIP)
 MODEL_NAME = 'sentence-transformers/clip-ViT-B-32'
 print(f"Loading model {MODEL_NAME}...")
