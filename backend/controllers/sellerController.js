@@ -448,6 +448,17 @@ const addSellerProduct = async (req, res) => {
         const product = new productModel(productData);
         await product.save();
 
+        // Asynchronously index in Vector DB
+        if (imagesUrl.length > 0) {
+            import('axios').then(axios => {
+                const embeddingServiceUrl = process.env.EMBEDDING_SERVICE_URL || 'http://127.0.0.1:8000';
+                axios.default.post(`${embeddingServiceUrl}/index`, {
+                    product_id: product._id.toString(),
+                    image_url: imagesUrl[0]
+                }).catch(err => console.warn('Vector indexing failed for seller product', product._id, ':', err.message));
+            }).catch(() => {});
+        }
+
         res.json({ success: true, message: "Product submitted successfully! Pending admin approval." });
 
     } catch (error) {

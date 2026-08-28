@@ -414,7 +414,7 @@ INSTRUCTIONS:
 };
 
 /**
- * Visual Search Controller (Image analysis via Ollama Llava with Strict SubCategory & Category Filtering)
+ * Vector-Based Visual Search Controller
  */
 export const visualSearch = async (req, res) => {
   try {
@@ -423,182 +423,103 @@ export const visualSearch = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Image data is required' });
     }
 
-    const products = await productModel.find({}).lean();
-    let detectedDescription = '';
-    let textLower = '';
-    let primarySubCategory = null; // 'Topwear', 'Bottomwear', 'Footwear', 'Accessories'
-    let primaryCategory = null;    // 'Men', 'Women', 'Kids'
-    let primaryType = null;        // 'shirt', 't-shirt', 'jeans', 'shoes', 'watch', 'dress', 'jacket'
-    let primaryColor = null;       // 'black', 'white', 'blue', 'pink', etc.
+    let base64Data = image;
+    // ensure prefix is present or absent based on what python expects.
+    // our python script strips prefix if it exists.
+
+    const embeddingServiceUrl = process.env.EMBEDDING_SERVICE_URL || 'http://127.0.0.1:8000';
 
     try {
-      let base64Data = image;
-      if (image.includes(',')) base64Data = image.split(',')[1];
+      // Call Python Vector Search Service
+      const searchRes = await axios.post(`${embeddingServiceUrl}/search`, {
+        image_base64: base64Data,
+        limit: 8
+      }, { timeout: 15000 });
 
-      const visionRes = await callOllama('/api/generate', {
-        model: OLLAMA_VISION_MODEL,
-        prompt: "Analyze this clothing photo. Identify: 1. Main item type (shirt, t-shirt, jeans, pants, shoes, watch, dress, jacket), 2. Category (Men, Women, Kids), 3. Color. Provide 3-5 keywords.",
-        images: [base64Data],
-        stream: false
-      }, 60000); // Increased timeout to 60 seconds for slower machines
-
-      detectedDescription = visionRes.data?.response || '';
-      console.log('👁️ Vision Raw Output:', detectedDescription);
-
-      textLower = detectedDescription.toLowerCase();
-
-      // Extract SubCategory
-      if (textLower.includes('topwear') || textLower.includes('shirt') || textLower.includes('t-shirt') || textLower.includes('top') || textLower.includes('jacket') || textLower.includes('hoodie')) {
-        primarySubCategory = 'Topwear';
-      } else if (textLower.includes('bottomwear') || textLower.includes('jeans') || textLower.includes('pant') || textLower.includes('trouser') || textLower.includes('cargo') || textLower.includes('skirt')) {
-        primarySubCategory = 'Bottomwear';
-      } else if (textLower.includes('footwear') || textLower.includes('shoe') || textLower.includes('sneaker') || textLower.includes('boot')) {
-        primarySubCategory = 'Footwear';
-      } else if (textLower.includes('accessory') || textLower.includes('accessories') || textLower.includes('jewellery') || textLower.includes('watch') || textLower.includes('sunglasses')) {
-        primarySubCategory = 'Accessories';
-      }
-
-      // Extract Gender / Category
-      if (/\b(men|man|gents|male|boy|ladka)\b/i.test(textLower)) primaryCategory = 'Men';
-      else if (/\b(women|woman|ladies|female|girl|ladki)\b/i.test(textLower)) primaryCategory = 'Women';
-      else if (/\b(kids|kid|children|baby)\b/i.test(textLower)) primaryCategory = 'Kids';
-
-      // Extract Specific Item Type
-      const itemTypes = ['t-shirt', 'shirt', 'cargo', 'jeans', 'pant', 'pants', 'trouser', 'sneakers', 'shoes', 'dress', 'jacket', 'watch', 'sunglasses', 'hoodie'];
-      for (const t of itemTypes) {
-        if (textLower.includes(t)) {
-          primaryType = t;
-          break;
+      if (searchRes.data && searchRes.data.success) {
+        const results = searchRes.data.results;
+        
+        if (results.length === 0) {
+          return res.json({
+            success: true,
+            isFashionItem: true,
+            description: "No similar items found in the catalogue.",
+            detectedSpecs: { category: null, subCategory: null, itemType: null, color: null },
+            totalMatches: 0,
+            products: []
+          });
         }
-      }
 
-      // Extract Primary Color
-      const colorList = ['black', 'blue', 'white', 'pink', 'red', 'green', 'yellow', 'grey', 'brown', 'purple'];
-      for (const c of colorList) {
-        if (textLower.includes(c)) {
-          primaryColor = c;
-          break;
+        // The python service returns an array of {product_id, score}
+        // Set a much stricter threshold based on CLIP score distributions.
+        // Unrelated (black/noise) = ~0.45 - 0.58
+        // Weak match / Different product type = ~0.60 - 0.68
+        // Visually similar / Strong match = 0.70+
+        const threshold = parseFloat(process.env.VISUAL_SEARCH_THRESHOLD) || 0.70;
+        const validResults = results.filter(r => r.score >= threshold);
+        
+        if (validResults.length === 0) {
+          return res.json({
+            success: true,
+            isFashionItem: true,
+            description: "No visually similar products found.",
+            detectedSpecs: { category: null, subCategory: null, itemType: null, color: null },
+            totalMatches: 0,
+            products: []
+          });
         }
-      }
 
-    } catch (visionErr) {
-      console.warn('Vision model notice:', visionErr.message);
+        // Extract product IDs
+        const productIds = validResults.map(r => r.product_id);
+        
+        // Fetch products from MongoDB
+        // Keep order of Qdrant results
+        const products = await productModel.find({ _id: { $in: productIds } }).lean();
+        
+        // Sort matching products based on the scores from validResults
+        const sortedProducts = productIds.map(id => {
+          const product = products.find(p => p._id.toString() === id);
+          if (product) {
+            const match = validResults.find(r => r.product_id === id);
+            product.similarityScore = match ? match.score : 0;
+            return product;
+          }
+          return null;
+        }).filter(Boolean);
+
+        return res.json({
+          success: true,
+          isFashionItem: true,
+          description: `Found ${sortedProducts.length} visually similar items.`,
+          detectedSpecs: { category: null, subCategory: null, itemType: null, color: null }, // Kept for frontend compatibility
+          totalMatches: sortedProducts.length,
+          products: sortedProducts
+        });
+      }
+    } catch (err) {
+      console.error('Visual Search Error:', err.message);
+      
+      // Handle explicit 400 Bad Request from Python API (e.g. blank images)
+      if (err.response && err.response.status === 400) {
+          return res.json({
+              success: true,
+              isFashionItem: false,
+              description: err.response.data?.detail || "Uploaded image is not suitable for visual search.",
+              detectedSpecs: { category: null, subCategory: null, itemType: null, color: null },
+              totalMatches: 0,
+              products: []
+          });
+      }
+      
       return res.json({
         success: false,
-        message: `Visual AI Error: ${visionErr.message}. Ensure Ollama is running and 'llava' model is installed. Processing images may take up to 60 seconds on standard hardware.`
+        message: "Visual search service is temporarily unavailable or returned an error."
       });
     }
 
-    const fashionKeywords = ['shirt', 't-shirt', 'topwear', 'bottomwear', 'footwear', 'accessory', 'accessories', 'jewellery', 'jeans', 'pant', 'pants', 'trouser', 'shoe', 'shoes', 'sneaker', 'dress', 'jacket', 'hoodie', 'watch', 'wear', 'clothing', 'apparel', 'outfit', 'garment', 'skirt', 'cargo'];
-    const isFashionItem = fashionKeywords.some(k => textLower.includes(k)) || Boolean(primarySubCategory || primaryType);
-
-    if (!isFashionItem) {
-      console.log('🚫 Non-fashion image detected in Visual Search. Returning 0 matches.');
-      return res.json({
-        success: true,
-        isFashionItem: false,
-        description: "No clothing or fashion apparel detected in this image.",
-        detectedSpecs: { category: null, subCategory: null, itemType: null, color: null },
-        totalMatches: 0,
-        products: []
-      });
-    }
-
-    if (!primarySubCategory) {
-      primarySubCategory = 'Topwear';
-    }
-
-    // -------------------------------------------------------------------
-    // ADVANCED FILTERING & RELEVANCE SCORING ENGINE (STRICT)
-    // -------------------------------------------------------------------
-    const scoredProducts = products.map(product => {
-      let score = 0;
-      const pName = (product.name || '').toLowerCase();
-      const pCategory = (product.category || '').toLowerCase();
-      const pSubCategory = (product.subCategory || '').toLowerCase();
-      const pDesc = (product.description || '').toLowerCase();
-      const pColors = (product.colors || []).map(c => c.toLowerCase());
-
-      // 1. SubCategory Matching (STRICT)
-      if (primarySubCategory) {
-        if (pSubCategory.includes(primarySubCategory.toLowerCase())) {
-          score += 50;
-        } else {
-          score -= 100; // STRICT: Do not match Topwear with Bottomwear
-        }
-      }
-
-      // 2. Specific Item Type Match with Semantic Aliases
-      if (primaryType) {
-        const typeAliases = {
-          'shirt': ['shirt', 'tee', 't-shirt', 'tshirt', 'top'],
-          't-shirt': ['t-shirt', 'tshirt', 'tee', 'shirt', 'top'],
-          'pant': ['pant', 'trouser', 'jeans', 'cargo', 'bottom'],
-          'pants': ['pant', 'trouser', 'jeans', 'cargo', 'bottom'],
-          'jeans': ['jeans', 'denim', 'pant', 'trouser'],
-          'shoes': ['shoe', 'sneaker', 'boot', 'footwear', 'kicks'],
-          'dress': ['dress', 'gown', 'frock', 'one-piece'],
-          'jacket': ['jacket', 'coat', 'hoodie', 'sweatshirt', 'outerwear']
-        };
-        
-        let typeMatched = false;
-        const aliasesToSearch = typeAliases[primaryType] || [primaryType];
-        
-        for (const alias of aliasesToSearch) {
-          if (pName.includes(alias) || pSubCategory.includes(alias) || pDesc.includes(alias)) {
-            typeMatched = true;
-            break;
-          }
-        }
-        
-        if (typeMatched) {
-          score += 40;
-        } else {
-          score -= 50; // STRICT: Heavy penalty if exact item type mismatch
-        }
-      }
-
-      // 3. Category / Gender Matching (STRICT)
-      if (primaryCategory) {
-        if (pCategory === primaryCategory.toLowerCase()) {
-          score += 30;
-        } else if (pCategory && pCategory !== primaryCategory.toLowerCase()) {
-          score -= 100; // STRICT: Gender mismatch is a hard reject
-        }
-      }
-
-      // 4. Color Matching
-      if (primaryColor) {
-        if (pColors.some(c => c.includes(primaryColor)) || pName.includes(primaryColor) || pDesc.includes(primaryColor)) {
-          score += 20;
-        }
-      }
-
-      return { product, score };
-    });
-
-    // Threshold remains 20, but mismatched items will be heavily negative
-    const matchingProducts = scoredProducts
-      .filter(item => item.score >= 20)
-      .sort((a, b) => b.score - a.score)
-      .map(item => item.product);
-
-    res.json({
-      success: true,
-      isFashionItem: true,
-      description: detectedDescription || `Detected ${primaryType || primarySubCategory || 'fashion item'}`,
-      detectedSpecs: {
-        category: primaryCategory,
-        subCategory: primarySubCategory,
-        itemType: primaryType,
-        color: primaryColor
-      },
-      totalMatches: matchingProducts.length,
-      products: matchingProducts.slice(0, 8)
-    });
   } catch (error) {
     console.error('Visual Search Error:', error);
-    res.json({
+    res.status(500).json({
       success: false,
       message: error.message || 'Visual Search Error'
     });
