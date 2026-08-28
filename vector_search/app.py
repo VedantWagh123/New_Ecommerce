@@ -18,10 +18,19 @@ print(f"Loading model {MODEL_NAME}...")
 model = SentenceTransformer(MODEL_NAME)
 print("Model loaded.")
 
-# Initialize Qdrant local client
-QDRANT_PATH = "qdrant_data"
+# Initialize Qdrant client (Cloud or Local)
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+
+if QDRANT_URL and QDRANT_API_KEY:
+    client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+    print("Connected to Qdrant Cloud.")
+else:
+    QDRANT_PATH = "qdrant_data"
+    client = QdrantClient(path=QDRANT_PATH)
+    print("Connected to Local Qdrant.")
+
 COLLECTION_NAME = "fashion_products"
-client = QdrantClient(path=QDRANT_PATH)
 
 # Ensure collection exists
 collections = [c.name for c in client.get_collections().collections]
