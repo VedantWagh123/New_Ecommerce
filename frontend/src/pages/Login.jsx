@@ -51,8 +51,16 @@ const Login = () => {
           
           const response = await axios.post(backendUrl + '/api/user/register',{name,email,password})
           if (response.data.success) {
-            setToken(response.data.token)
-            localStorage.setItem('token',response.data.token)
+            if (response.data.otpPending) {
+              setOtpPending(true);
+              setTempToken(response.data.tempToken);
+              setTimer(60);
+              toast.success(response.data.message);
+            } else {
+              toast.success("Account created successfully! Please login.");
+              setCurrentState('Login');
+              setPasword('');
+            }
           } else {
             toast.error(response.data.message)
           }

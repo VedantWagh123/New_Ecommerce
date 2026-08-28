@@ -189,52 +189,15 @@ const registerUser = async (req, res) => {
         const salt = await bcrypt.genSalt(10)
         const hashedPassword = await bcrypt.hash(password, salt)
 
-        // Generate OTP logic for new registration
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const otpHash = await bcrypt.hash(otp, 10);
-
         const newUser = new userModel({
             name,
             email,
-            password: hashedPassword,
-            otpHash,
-            otpExpiresAt: Date.now() + 3 * 60 * 1000,
-            otpAttempts: 0,
-            otpLastSentAt: Date.now()
+            password: hashedPassword
         })
 
         const user = await newUser.save()
 
-        const message = `
-        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9fafb; padding: 40px 0; text-align: center;">
-            <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                <div style="background: linear-gradient(135deg, #111827 0%, #374151 100%); padding: 30px; text-align: center;">
-                    <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700;">Welcome to Veloura!</h1>
-                </div>
-                <div style="padding: 40px 30px; text-align: left;">
-                    <p style="color: #4b5563; font-size: 16px; margin-top: 0;">Hello ${name},</p>
-                    <p style="color: #4b5563; font-size: 16px;">Please use the following 6-digit verification code to complete your registration securely.</p>
-                    
-                    <div style="text-align: center; margin: 30px 0; background-color: #f3f4f6; padding: 20px; border-radius: 8px;">
-                        <span style="font-size: 32px; font-weight: 700; color: #111827; letter-spacing: 4px;">${otp}</span>
-                    </div>
-                    
-                    <p style="color: #ef4444; font-size: 14px; font-weight: 600; margin-bottom: 5px;">This code expires in 3 minutes.</p>
-                </div>
-            </div>
-        </div>`;
-
-        if (process.env.SMTP_EMAIL && process.env.SMTP_PASSWORD) {
-            await sendEmail({ to: user.email, subject: 'Your Registration Verification Code', html: message });
-        } else {
-            console.log("-------------------------------------------------");
-            console.log(`[DEV ONLY] OTP for NEW USER ${user.email} is: ${otp}`);
-            console.log("-------------------------------------------------");
-        }
-
-        const tempToken = jwt.sign({ tempUserId: user._id, isOtpPending: true }, process.env.JWT_SECRET, { expiresIn: '15m' });
-
-        res.json({ success: true, message: "OTP sent to your email to complete registration", otpPending: true, tempToken, email: user.email })
+        res.json({ success: true, message: "Account created successfully. Please login." })
 
     } catch (error) {
         console.log(error);
