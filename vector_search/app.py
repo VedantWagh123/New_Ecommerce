@@ -14,13 +14,21 @@ app = FastAPI(title="Fashion Visual Search API")
 
 import torch
 # Optimize PyTorch memory for 512MB RAM constraints (Render Free Tier)
-torch.set_num_threads(1)
 os.environ["MALLOC_ARENA_MAX"] = "2"
+os.environ["OMP_NUM_THREADS"] = "1"
+torch.set_num_threads(1)
+torch.set_grad_enabled(False) # Disable gradients globally to save memory
 
 # Initialize Model (CLIP)
 MODEL_NAME = 'sentence-transformers/clip-ViT-B-32'
-print(f"Loading model {MODEL_NAME}...")
-model = SentenceTransformer(MODEL_NAME)
+print(f"Loading model {MODEL_NAME} (optimized for low memory)...")
+model = SentenceTransformer(
+    MODEL_NAME, 
+    model_kwargs={
+        "torch_dtype": torch.bfloat16, # Cuts RAM usage of model weights in half
+        "low_cpu_mem_usage": True      # Prevents memory spike during loading
+    }
+)
 print("Model loaded.")
 
 # Initialize Qdrant client (Cloud or Local)
