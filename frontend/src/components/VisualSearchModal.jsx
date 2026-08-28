@@ -15,7 +15,7 @@ const VisualSearchModal = ({ isOpen, onClose }) => {
     const [searchStep, setSearchStep] = useState('Validating Image...');
     const [errorMsg, setErrorMsg] = useState('');
     const [isDragOver, setIsDragOver] = useState(false);
-    const [scanningText, setScanningText] = useState('Initializing AI Vision...');
+    const [scanningText, setScanningText] = useState('Initializing Lumi Lens...');
 
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
@@ -27,7 +27,7 @@ const VisualSearchModal = ({ isOpen, onClose }) => {
         let intervalId;
         if (mode === 'SEARCHING') {
             const texts = [
-                'Initializing AI Vision...',
+                'Initializing Lumi Lens...',
                 'Extracting Colors & Patterns...',
                 'Analyzing Fabric & Fit...',
                 'Scanning Store Catalogue...',
@@ -205,7 +205,6 @@ const VisualSearchModal = ({ isOpen, onClose }) => {
             
             let finalMatches = [];
             let apiSuccess = false;
-
             try {
                 const response = await axios.post(`${backendUrl}/api/ai/visual-search`, {
                     image: selectedImage
@@ -213,13 +212,14 @@ const VisualSearchModal = ({ isOpen, onClose }) => {
 
                 if (response.data && response.data.success) {
                     if (response.data.isFashionItem === false) {
-                        // explicitly not a fashion item
+                        // explicitly not a fashion item, no need for fallback
                         apiSuccess = true;
                         finalMatches = [];
                     } else if (response.data.products && response.data.products.length > 0) {
                         apiSuccess = true;
                         finalMatches = response.data.products;
                     }
+                    // If isFashionItem is true but products are empty, apiSuccess remains false, triggering local fallback!
                 }
             } catch (err) {
                 console.warn('Backend visual search failed:', err.message);
@@ -230,8 +230,8 @@ const VisualSearchModal = ({ isOpen, onClose }) => {
                 // Allow UI to update before heavy local processing
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
-                // Fallback to local heuristic search
-                const localMatches = await matchCatalogProducts(userFeatures, products, 50);
+                // Fallback to local heuristic search (visual similarity)
+                const localMatches = await matchCatalogProducts(userFeatures, products, 65);
                 finalMatches = localMatches;
             }
 
@@ -255,7 +255,7 @@ const VisualSearchModal = ({ isOpen, onClose }) => {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/70 backdrop-blur-sm animate-fade-in overflow-y-auto">
             <div 
-                className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-gray-100 my-auto"
+                className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-gray-100 my-auto custom-scrollbar scroll-smooth"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
@@ -263,7 +263,7 @@ const VisualSearchModal = ({ isOpen, onClose }) => {
                     <div>
                         <div className="flex items-center gap-2">
                             <h2 className="text-lg sm:text-xl font-bold text-gray-900">
-                                📷 AI Visual Search
+                                ✨ Lumi Lens
                             </h2>
                             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-black text-white">
                                 Store Catalog Match
@@ -289,7 +289,7 @@ const VisualSearchModal = ({ isOpen, onClose }) => {
                 <canvas ref={canvasRef} className="hidden" />
 
                 {/* Modal Body */}
-                <div className="p-5 sm:p-6 overflow-y-auto flex-1 bg-white space-y-5">
+                <div className="p-5 sm:p-6 overflow-y-auto flex-1 bg-white space-y-5 custom-scrollbar scroll-smooth">
                     {/* Error Banner */}
                     {errorMsg && mode !== 'INVALID_IMAGE' && (
                         <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 font-medium flex items-center justify-between">
@@ -300,18 +300,21 @@ const VisualSearchModal = ({ isOpen, onClose }) => {
 
                     {/* MODE 1: CHOICE (Upload or Camera) */}
                     {mode === 'CHOICE' && (
-                        <div className="space-y-4">
+                        <div className="space-y-6">
                             <div 
                                 onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
                                 onDragLeave={() => setIsDragOver(false)}
                                 onDrop={handleDrop}
                                 onClick={() => fileInputRef.current?.click()}
-                                className={`border-2 border-dashed rounded-3xl p-8 text-center cursor-pointer transition-all ${
+                                className={`relative group overflow-hidden border-2 border-dashed rounded-3xl p-10 text-center cursor-pointer transition-all duration-300 ease-out ${
                                     isDragOver 
-                                        ? 'border-black bg-gray-50 scale-101' 
-                                        : 'border-gray-300 hover:border-black hover:bg-gray-50/60'
+                                        ? 'border-indigo-500 bg-indigo-50/50 scale-[1.02] shadow-lg' 
+                                        : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50/80 hover:shadow-md'
                                 }`}
                             >
+                                {/* Animated background glow on hover */}
+                                <div className="absolute inset-0 bg-gradient-to-tr from-indigo-50/0 via-purple-50/0 to-pink-50/0 group-hover:from-indigo-50/40 group-hover:via-purple-50/40 group-hover:to-pink-50/40 transition-colors duration-500 rounded-3xl pointer-events-none" />
+                                
                                 <input 
                                     ref={fileInputRef} 
                                     type="file" 
@@ -319,29 +322,32 @@ const VisualSearchModal = ({ isOpen, onClose }) => {
                                     onChange={handleFileSelect} 
                                     className="hidden" 
                                 />
-                                <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl text-gray-600">
-                                    📁
+                                <div className="w-16 h-16 bg-white shadow-sm border border-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300">
+                                    <span className="drop-shadow-sm">✨</span>
                                 </div>
-                                <h3 className="text-sm font-bold text-gray-900">Upload Product Image</h3>
-                                <p className="text-xs text-gray-500 mt-1">
-                                    Drag & drop your clothing photo here, or <span className="text-black font-bold underline">browse files</span>
+                                <h3 className="text-base font-bold text-gray-900 group-hover:text-indigo-900 transition-colors">Upload Product Image</h3>
+                                <p className="text-sm text-gray-500 mt-2 relative z-10">
+                                    Drag & drop your clothing photo here, or <span className="text-indigo-600 font-bold underline decoration-indigo-200 underline-offset-2 group-hover:decoration-indigo-500 transition-all">browse files</span>
                                 </p>
-                                <span className="inline-block mt-3 px-3 py-1 bg-gray-100 text-gray-600 text-[11px] font-semibold rounded-full">
+                                <span className="inline-block mt-4 px-4 py-1.5 bg-white border border-gray-100 shadow-sm text-gray-500 text-xs font-semibold rounded-full group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-colors relative z-10">
                                     Supports JPG, PNG, WEBP (Max 10MB)
                                 </span>
                             </div>
 
-                            <div className="relative flex py-1 items-center">
+                            <div className="relative flex py-2 items-center">
                                 <div className="flex-grow border-t border-gray-200"></div>
-                                <span className="flex-shrink mx-4 text-xs font-bold text-gray-400 uppercase tracking-widest">OR</span>
+                                <span className="flex-shrink mx-4 text-xs font-bold text-gray-400 uppercase tracking-widest bg-white px-2 rounded-full">OR</span>
                                 <div className="flex-grow border-t border-gray-200"></div>
                             </div>
 
                             <button
                                 onClick={startCamera}
-                                className="w-full bg-black hover:bg-gray-800 text-white font-bold py-3.5 px-4 rounded-2xl text-xs transition-all shadow-md flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
+                                className="w-full relative overflow-hidden bg-gray-900 text-white font-bold py-4 px-4 rounded-2xl text-sm transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95 flex items-center justify-center gap-3 cursor-pointer group"
                             >
-                                <span>📷</span> Open Camera & Capture Photo
+                                {/* Button hover shimmer effect */}
+                                <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12" />
+                                <span className="text-lg group-hover:scale-110 transition-transform">📷</span> 
+                                <span>Open Camera & Capture Photo</span>
                             </button>
                         </div>
                     )}
@@ -441,110 +447,56 @@ const VisualSearchModal = ({ isOpen, onClose }) => {
 
                     {/* MODE 5: SEARCHING LOADER */}
                     {mode === 'SEARCHING' && (
-                        <div className="py-8 text-center space-y-8 relative">
-                            {/* High-Tech Background Ambient Glows */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-sky-100/70 rounded-full blur-[100px] animate-pulse pointer-events-none"></div>
-                            
-                            <div className="relative max-w-sm mx-auto group">
-                                {/* Decorative Tech Border Elements */}
-                                <div className="absolute -top-3 -left-3 w-8 h-8 border-t-2 border-l-2 border-indigo-500 rounded-tl-xl animate-pulse"></div>
-                                <div className="absolute -top-3 -right-3 w-8 h-8 border-t-2 border-r-2 border-indigo-500 rounded-tr-xl animate-pulse"></div>
-                                <div className="absolute -bottom-3 -left-3 w-8 h-8 border-b-2 border-l-2 border-indigo-500 rounded-bl-xl animate-pulse"></div>
-                                <div className="absolute -bottom-3 -right-3 w-8 h-8 border-b-2 border-r-2 border-indigo-500 rounded-br-xl animate-pulse"></div>
-
-                                <div className="relative max-h-80 w-full rounded-2xl overflow-hidden shadow-[0_20px_50px_-12px_rgba(99,102,241,0.3)] bg-gray-900 border border-gray-800">
-                                    {/* Base Image */}
-                                    <img 
-                                        src={selectedImage} 
-                                        alt="Scanning..." 
-                                        className="w-full h-72 object-cover opacity-60 mix-blend-screen"
-                                    />
+                        <div className="py-8 text-center space-y-6 relative">
+                            <div className="relative max-w-sm mx-auto rounded-3xl overflow-hidden shadow-md">
+                                {/* Base Image */}
+                                <img 
+                                    src={selectedImage} 
+                                    alt="Scanning..." 
+                                    className="w-full h-80 object-cover brightness-75"
+                                />
+                                
+                                {/* Google Lens style white dots container */}
+                                <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+                                    {/* Pulsating dots scattered around */}
+                                    <div className="absolute top-[30%] left-[40%] w-2.5 h-2.5 bg-white rounded-full shadow-[0_0_10px_3px_rgba(255,255,255,0.8)] animate-[pulse-dot_1.5s_infinite]"></div>
+                                    <div className="absolute top-[60%] left-[25%] w-3 h-3 bg-white rounded-full shadow-[0_0_10px_3px_rgba(255,255,255,0.8)] animate-[pulse-dot_2s_infinite_0.3s]"></div>
+                                    <div className="absolute top-[45%] right-[30%] w-2 h-2 bg-white rounded-full shadow-[0_0_10px_3px_rgba(255,255,255,0.8)] animate-[pulse-dot_1.8s_infinite_0.7s]"></div>
+                                    <div className="absolute top-[20%] right-[20%] w-3 h-3 bg-white rounded-full shadow-[0_0_10px_3px_rgba(255,255,255,0.8)] animate-[pulse-dot_2.2s_infinite_0.1s]"></div>
+                                    <div className="absolute bottom-[25%] right-[40%] w-2.5 h-2.5 bg-white rounded-full shadow-[0_0_10px_3px_rgba(255,255,255,0.8)] animate-[pulse-dot_1.6s_infinite_0.5s]"></div>
                                     
-                                    {/* Advanced Crosshair Scanner */}
-                                    <div className="absolute top-0 left-0 right-0 h-full w-full pointer-events-none">
-                                        {/* Horizontal Laser */}
-                                        <div className="absolute top-0 left-0 right-0 h-[2px] bg-cyan-400 shadow-[0_0_15px_3px_rgba(34,211,238,0.8)] animate-[scan-y_3s_ease-in-out_infinite]" />
-                                        {/* Vertical Laser */}
-                                        <div className="absolute top-0 bottom-0 left-0 w-[2px] bg-indigo-500 shadow-[0_0_15px_3px_rgba(99,102,241,0.8)] animate-[scan-x_4s_ease-in-out_infinite]" />
-                                    </div>
-
-                                    {/* Dynamic AI Bounding Boxes */}
-                                    <div className="absolute inset-0 pointer-events-none">
-                                        <div className="absolute top-[20%] left-[30%] w-24 h-24 border border-cyan-400/80 bg-cyan-400/10 rounded-sm animate-[focus-box_2s_infinite]">
-                                            <div className="absolute -top-5 left-0 bg-cyan-400 text-black text-[8px] font-mono px-1 font-bold">TEXTURE: MATCH</div>
-                                        </div>
-                                        <div className="absolute bottom-[30%] right-[20%] w-16 h-20 border border-indigo-400/80 bg-indigo-400/10 rounded-sm animate-[focus-box_3s_infinite_1s]">
-                                            <div className="absolute -top-5 left-0 bg-indigo-400 text-white text-[8px] font-mono px-1 font-bold">PATTERN: OK</div>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Live Data Feed Terminal (Mock) */}
-                                    <div className="absolute bottom-4 left-4 right-4 bg-black/60 backdrop-blur-md rounded-lg p-2 border border-gray-700/50 text-left">
-                                        <div className="font-mono text-[9px] text-cyan-400 leading-tight animate-[scroll-feed_3s_linear_infinite]">
-                                            <div>&gt; Initializing neural net... OK</div>
-                                            <div className="text-indigo-300">&gt; Extracting visual vectors... [||||||||] 100%</div>
-                                            <div>&gt; Identifying fabric composition...</div>
-                                            <div className="text-pink-300">&gt; Querying Veloura Database...</div>
-                                            <div>&gt; Running similarity search...</div>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Overlay Grid pattern for tech feel */}
-                                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.15] mix-blend-overlay"></div>
+                                    {/* A subtle scanning light wave that moves up and down */}
+                                    <div className="absolute left-0 right-0 h-[30vh] bg-gradient-to-b from-transparent via-white/20 to-transparent animate-[scan-wave_3s_ease-in-out_infinite]"></div>
                                 </div>
                             </div>
                             
-                            <div className="space-y-4 relative z-10 pt-4">
-                                <div className="flex items-center justify-center gap-4">
-                                    {/* Percentage Counter */}
-                                    <div className="w-14 h-14 rounded-full border-4 border-indigo-100 flex items-center justify-center border-t-indigo-600 animate-[spin_2s_linear_infinite]">
-                                        <div className="w-full h-full rounded-full flex items-center justify-center bg-white animate-[spin_2s_linear_infinite_reverse]">
-                                            <span className="text-xs font-black text-indigo-900 animate-pulse">99%</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="text-left">
-                                        <h3 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 animate-gradient-x tracking-tight">
-                                            Neural Processing...
-                                        </h3>
-                                        <p className="text-[11px] font-bold text-gray-500 font-mono tracking-[0.15em] mt-1 uppercase transition-all duration-300">
-                                            {scanningText}
-                                        </p>
-                                    </div>
-                                </div>
+                            <div className="space-y-2">
+                                <h3 className="text-lg font-bold text-gray-800">
+                                    {scanningText}
+                                </h3>
+                                <p className="text-sm text-gray-500">
+                                    Looking for similar items...
+                                </p>
                             </div>
                             
                             {/* Inline style for the scan keyframes */}
                             <style>{`
-                                @keyframes scan-y {
-                                    0% { transform: translateY(0); opacity: 0; }
-                                    10% { opacity: 1; }
-                                    90% { opacity: 1; }
-                                    100% { transform: translateY(280px); opacity: 0; }
+                                @keyframes pulse-dot {
+                                    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+                                    50% { opacity: 1; transform: scale(1.5); }
                                 }
-                                @keyframes scan-x {
-                                    0% { transform: translateX(0); opacity: 0; }
-                                    10% { opacity: 1; }
-                                    90% { opacity: 1; }
-                                    100% { transform: translateX(380px); opacity: 0; }
+                                @keyframes scan-wave {
+                                    0% { transform: translateY(-100%); }
+                                    50% { transform: translateY(100%); }
+                                    100% { transform: translateY(-100%); }
                                 }
-                                @keyframes focus-box {
-                                    0%, 100% { opacity: 0; transform: scale(0.9); }
-                                    10%, 90% { opacity: 1; transform: scale(1); }
+                                @keyframes shimmer {
+                                    100% { transform: translateX(200%); }
                                 }
-                                @keyframes scroll-feed {
-                                    0% { transform: translateY(10px); opacity: 0.5; }
-                                    50% { transform: translateY(-5px); opacity: 1; }
-                                    100% { transform: translateY(-20px); opacity: 0; }
-                                }
-                                .animate-gradient-x {
-                                    background-size: 200% 200%;
-                                    animation: gradient-x 3s ease infinite;
-                                }
-                                @keyframes gradient-x {
-                                    0%, 100% { background-position: 0% 50%; }
-                                    50% { background-position: 100% 50%; }
-                                }
+                                .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+                                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                                .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+                                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
                             `}</style>
                         </div>
                     )}
@@ -592,7 +544,7 @@ const VisualSearchModal = ({ isOpen, onClose }) => {
                                         </button>
                                     </div>
 
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-96 overflow-y-auto p-1">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-96 overflow-y-auto p-1 custom-scrollbar scroll-smooth pb-4">
                                         {similarProducts.map((item) => (
                                             <div 
                                                 key={item._id} 

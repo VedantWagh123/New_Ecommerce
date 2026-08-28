@@ -181,7 +181,7 @@ const Navbar = () => {
                                 onClick={() => { 
                                     setIsProfileOpen(false); 
                                     if (sellerStatus === 'approved' || sellerStatus === 'pending') {
-                                        window.location.href = `http://localhost:5175/?sso_token=${token}`;
+                                        window.open(`http://localhost:5175/?sso_token=${token}`, '_blank');
                                     } else {
                                         navigate('/profile');
                                     }
