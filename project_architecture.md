@@ -136,6 +136,21 @@ Ek highly intelligent, ChatGPT-style chatbot jo direct MongoDB database se conne
 - **Visual Search (Computer Vision):** Agar user koi photo upload karta hai, toh `llava` vision model us photo ko analyze karta hai (Color, Type, Category) aur uske hisab se similar products humare database se nikal kar deta hai.
 - **Context Awareness:** Chatbot history yaad rakhta hai. Agar user ne bola "Under 2000" aur fir bola "Show red ones", toh AI ko samajh aata hai ki "red ones under 2000" ki baat ho rahi hai.
 
+### Feature 13: Vector Search (Visual Image Search) Microservice
+Ek advanced reverse-image search system jo user ko photo upload karke similar kapde dhundne ki suvidha deta hai.
+- **Technology Stack:** Python, FastAPI, HuggingFace Transformers (CLIP model `openai/clip-vit-base-patch32`), aur Qdrant Vector Database.
+- **Microservice Architecture:** Backend Node.js ke alawa ek separate Python FastAPI server banaya gaya hai. 
+- **How It Works:** Jab user photo upload karta hai, Python server CLIP model ka use karke us image ko ek 512-dimensional mathematical vector me convert karta hai. Qdrant database me maujood saare products ke vectors se iska distance (Cosine Similarity) check hota hai, aur sabse visually similar products frontend par dikhaye jate hain.
+- **Extreme Optimization for Render (512MB RAM):** Deep learning models heavy hote hain, isliye is service ko ultra-low memory par chalane ke liye optimizations ki gayi: `torch.inference_mode()` lagaya gaya, gradients disable kiye gaye, aur CPU-only inference with a single worker thread deploy kiya gaya taaki server Out-Of-Memory (OOM) crash na ho.
+
+### Feature 14: Seamless Single Sign-On (SSO) for Vendors
+- **Frictionless Navigation:** Jab koi user seller banne ke baad apne customer profile se "Seller Dashboard" pe click karta hai, toh use dobara login nahi karna padta.
+- **Security:** Frontend securely ek one-time URL (`?sso_token=...`) generate karta hai. Seller React application load hote hi us token ko intercept karti hai, `localStorage` me save karti hai, aur turant URL history ko clean kar deti hai taaki token browser address bar me visible na rahe. Isse user direct authenticated seller dashboard me enter hota hai.
+
+### Feature 15: Deep Mobile-Responsive Architecture
+- **App-like Web Experience:** Frontend aur Admin/Seller panels ko completely mobile-optimized kiya gaya hai.
+- **Techniques Used:** TailwindCSS ke `sm:` aur `md:` breakpoints ka massive use karke layouts ko stack kiya gaya hai. Complex data tables (jaise Admin Orders ya Seller Inventory) ko responsive scrollable wrappers (`overflow-x-auto`) me dala gaya hai, taaki 320px ki chhoti phone screen par bhi UI shrink ya cut na ho, aur Desktop UI bilkul untouched aur premium rahe.
+
 ---
 
 ## 📂 5. Database Schema (Collections)
