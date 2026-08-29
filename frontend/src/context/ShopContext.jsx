@@ -72,6 +72,16 @@ const ShopContextProvider = (props) => {
             }
         }
 
+        // Analytics Tracking for ADD_TO_CART
+        try {
+            axios.post(backendUrl + '/api/product/track-event', {
+                productId: itemId,
+                eventType: 'ADD_TO_CART'
+            }, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {}
+            }).catch(() => {}); // Fire and forget
+        } catch (e) {}
+
     }
 
     const addToSavedForLater = (itemId, size) => {

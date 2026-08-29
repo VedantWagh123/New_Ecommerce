@@ -43,6 +43,26 @@ const Orders = ({ token }) => {
     }
   };
 
+  const cancelActionHandler = async (orderId, action) => {
+    try {
+      const url = action === 'approve' ? '/api/order/cancel/approve' : '/api/order/cancel/reject';
+      const response = await axios.post(
+        backendUrl + url,
+        { orderId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        toast.success(response.data.message);
+        fetchAllOrders();
+      } else {
+        toast.error(response.data.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error.message || 'Error processing cancellation');
+    }
+  };
+
   const fetchAllOrders = async () => {
     if (!token) return;
     setLoading(true);
@@ -168,6 +188,7 @@ const Orders = ({ token }) => {
   const outForDeliveryCount = orders.filter(o => o.status === ORDER_STATUS.OUT_FOR_DELIVERY).length;
   const deliveredCount = orders.filter(o => o.status === ORDER_STATUS.DELIVERED).length;
   const cancelledCount = orders.filter(o => o.status === ORDER_STATUS.CANCELLED || o.status === ORDER_STATUS.DELIVERY_FAILED).length;
+  const cancelRequestsCount = orders.filter(o => o.cancelStatus === 'Requested').length;
 
   const totalRevenue = orders
     .filter(o => o.status !== ORDER_STATUS.CANCELLED && o.status !== ORDER_STATUS.DELIVERY_FAILED)
@@ -191,7 +212,11 @@ const Orders = ({ token }) => {
                             cust.phone.toLowerCase().includes(search) ||
                             cust.orders.some(o => (o._id || '').toLowerCase().includes(search));
 
-      const matchesStatus = statusFilter === 'ALL' || cust.orders.some(o => (o.status || 'Packing') === statusFilter);
+      const matchesStatus = statusFilter === 'ALL' 
+                            ? true 
+                            : statusFilter === 'CANCEL_REQUEST'
+                                ? cust.orders.some(o => o.cancelStatus === 'Requested')
+                                : cust.orders.some(o => (o.status || 'Packing') === statusFilter);
       const matchesPayment = paymentFilter === 'ALL' || cust.orders.some(o => (o.paymentMethod || '').toLowerCase() === paymentFilter.toLowerCase());
       const matchesPaymentStatus = paymentStatusFilter === 'ALL' || cust.orders.some(o => paymentStatusFilter === 'PAID' ? o.payment : !o.payment);
 
@@ -218,7 +243,11 @@ const Orders = ({ token }) => {
                             phoneStr.includes(searchTerm.toLowerCase());
 
       const orderStatus = order.status || 'Packing';
-      const statusMatches = statusFilter === 'ALL' || orderStatus === statusFilter;
+      const statusMatches = statusFilter === 'ALL' 
+                            ? true
+                            : statusFilter === 'CANCEL_REQUEST'
+                                ? order.cancelStatus === 'Requested'
+                                : orderStatus === statusFilter;
       const paymentMatches = paymentFilter === 'ALL' || (order.paymentMethod || '').toLowerCase() === paymentFilter.toLowerCase();
       const paymentStatusMatches = paymentStatusFilter === 'ALL' || 
                                    (paymentStatusFilter === 'PAID' ? order.payment : !order.payment);
@@ -233,7 +262,7 @@ const Orders = ({ token }) => {
   }, [orders, searchTerm, statusFilter, paymentFilter, paymentStatusFilter, sortBy]);
 
   return (
-    <div className='w-full pb-20 animate-fade-in'>
+    <div className='w-full pb-20'>
       <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 bg-white p-6 rounded-3xl border border-gray-200/80 shadow-xs'>
         <div>
           <div className='flex items-center gap-3 flex-wrap'>
@@ -372,6 +401,21 @@ const Orders = ({ token }) => {
             <span className='text-xs'>🚫</span>
           </div>
           <p className='text-2xl font-black mt-2'>{cancelledCount}</p>
+        </div>
+
+        <div 
+          onClick={() => setStatusFilter('CANCEL_REQUEST')}
+          className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+            statusFilter === 'CANCEL_REQUEST'
+              ? 'bg-amber-600 text-white border-amber-600 shadow-md'
+              : 'bg-amber-50/60 text-amber-900 border-amber-100 shadow-2xs hover:shadow hover:-translate-y-0.5'
+          }`}
+        >
+          <div className='flex items-center justify-between'>
+            <p className={`text-[10px] font-bold uppercase tracking-widest ${statusFilter === 'CANCEL_REQUEST' ? 'text-amber-100' : 'text-amber-700'}`}>Cancel Req.</p>
+            <span className='text-xs'>⏳</span>
+          </div>
+          <p className='text-2xl font-black mt-2'>{cancelRequestsCount}</p>
         </div>
 
         <div className='bg-gray-900 text-white p-4 rounded-2xl border border-gray-800 shadow-md hover:-translate-y-0.5 transition-all col-span-2 sm:col-span-1'>
@@ -657,21 +701,36 @@ const Orders = ({ token }) => {
                               </div>
 
                               <div className='md:col-span-3 flex items-center justify-end gap-2'>
-                                <select
-                                  value={currentStatus}
-                                  onChange={(e) => statusHandler(order._id, e.target.value)}
-                                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${getStatusBadgeStyle(currentStatus)}`}
-                                >
-                                  {ALL_STATUSES.map(st => (
-                                    <option key={st} value={st}>{st}</option>
-                                  ))}
-                                </select>
+                                {order.cancelStatus === 'Requested' ? (
+                                  <div className="flex items-center gap-1">
+                                    <button onClick={() => cancelActionHandler(order._id, 'approve')} className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-xs font-bold transition-colors">Approve Cancel</button>
+                                    <button onClick={() => cancelActionHandler(order._id, 'reject')} className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-xs font-bold transition-colors">Reject</button>
+                                  </div>
+                                ) : ['Packing', 'Accepted'].includes(currentStatus) ? (
+                                  <span className="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-xl text-[10px] font-bold border border-gray-200 uppercase tracking-wider text-center">
+                                    Pending Seller Acceptance
+                                  </span>
+                                ) : (
+                                  <select
+                                    value={currentStatus}
+                                    onChange={(e) => statusHandler(order._id, e.target.value)}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${getStatusBadgeStyle(currentStatus)}`}
+                                  >
+                                    <option value={currentStatus}>{currentStatus}</option>
+                                    {['Packed', 'Ready to Ship', 'Handed to Logistics', 'Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled']
+                                      .slice(['Packed', 'Ready to Ship', 'Handed to Logistics', 'Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled'].indexOf(currentStatus) + 1)
+                                      .map(st => (
+                                        <option key={st} value={st}>{st}</option>
+                                      ))
+                                    }
+                                  </select>
+                                )}
 
                                 <button
                                   onClick={() => setSelectedOrderDetails(order)}
-                                  className='bg-black hover:bg-gray-800 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer'
+                                  className='bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5'
                                 >
-                                  Details
+                                  <span>👁️</span> Details
                                 </button>
 
                                 <button
@@ -813,15 +872,33 @@ const Orders = ({ token }) => {
                         </td>
 
                         <td className='p-4 align-middle'>
-                          <select
-                            value={currentStatus}
-                            onChange={(e) => statusHandler(order._id, e.target.value)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${getStatusBadgeStyle(currentStatus)}`}
-                          >
-                            {ALL_STATUSES.map(st => (
-                              <option key={st} value={st}>{st}</option>
-                            ))}
-                          </select>
+                          {order.cancelStatus === 'Requested' ? (
+                            <div className="flex flex-col gap-1 w-full max-w-[120px]">
+                              <span className="text-[10px] font-bold text-rose-600 uppercase">Cancel Requested</span>
+                              <div className="flex gap-1">
+                                <button onClick={() => cancelActionHandler(order._id, 'approve')} className="px-2 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded text-[10px] font-bold flex-1">Approve</button>
+                                <button onClick={() => cancelActionHandler(order._id, 'reject')} className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded text-[10px] font-bold flex-1">Reject</button>
+                              </div>
+                            </div>
+                          ) : ['Packing', 'Accepted'].includes(currentStatus) ? (
+                            <span className="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-xl text-[10px] font-bold border border-gray-200 uppercase tracking-wider text-center block w-full max-w-[140px]">
+                              Pending Seller Acceptance
+                            </span>
+                          ) : (
+                            <select
+                              value={currentStatus}
+                              onChange={(e) => statusHandler(order._id, e.target.value)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer w-full max-w-[140px] ${getStatusBadgeStyle(currentStatus)}`}
+                            >
+                              <option value={currentStatus}>{currentStatus}</option>
+                              {['Packed', 'Ready to Ship', 'Handed to Logistics', 'Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled']
+                                .slice(['Packed', 'Ready to Ship', 'Handed to Logistics', 'Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled'].indexOf(currentStatus) + 1)
+                                .map(st => (
+                                  <option key={st} value={st}>{st}</option>
+                                ))
+                              }
+                            </select>
+                          )}
                         </td>
 
                         <td className='p-4 text-right pr-6 align-middle'>
@@ -901,12 +978,19 @@ const Orders = ({ token }) => {
                     </div>
 
                     <div className='flex items-center gap-2'>
-                      <button
-                        onClick={() => setSelectedOrderDetails(order)}
-                        className='bg-black hover:bg-gray-800 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer'
-                      >
-                        Details
-                      </button>
+                      {order.cancelStatus === 'Requested' ? (
+                        <div className="flex gap-1">
+                          <button onClick={() => cancelActionHandler(order._id, 'approve')} className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-2 rounded-xl text-[10px] font-bold transition-all shadow-xs cursor-pointer">Approve Cancel</button>
+                          <button onClick={() => cancelActionHandler(order._id, 'reject')} className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-2 rounded-xl text-[10px] font-bold transition-all shadow-xs cursor-pointer">Reject</button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setSelectedOrderDetails(order)}
+                          className='bg-black hover:bg-gray-800 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer'
+                        >
+                          Details
+                        </button>
+                      )}
                       <button
                         onClick={() => setOrderToDelete(order)}
                         className='bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 p-2 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer'

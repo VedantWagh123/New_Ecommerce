@@ -400,6 +400,23 @@ const updateStatus = async (req,res) => {
             return res.json({ success: false, message: 'Order not found' });
         }
 
+        const validAdminStatuses = ['Packed', 'Ready to Ship', 'Handed to Logistics', 'Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled'];
+        
+        if (existingOrder.cancelStatus === 'Requested' && status !== 'Cancelled') {
+            return res.json({ success: false, message: "Cannot update status while a cancellation request is pending." });
+        }
+
+        if (['Packing', 'Accepted'].includes(existingOrder.status) && status !== 'Cancelled') {
+            return res.json({ success: false, message: "Admin cannot update status before seller fulfills the order (Packed)." });
+        }
+
+        const currentStatusIdx = validAdminStatuses.indexOf(existingOrder.status);
+        const nextStatusIdx = validAdminStatuses.indexOf(status);
+
+        if (nextStatusIdx !== -1 && currentStatusIdx !== -1 && nextStatusIdx < currentStatusIdx) {
+            return res.json({ success: false, message: "Cannot move order status backwards." });
+        }
+
         const history = existingOrder.statusHistory || [];
         const newHistoryEntry = {
             status,
@@ -601,4 +618,133 @@ const getAdminAnalytics = async (req, res) => {
     }
 }
 
-export {verifyRazorpay, verifyStripe ,placeOrder, placeOrderStripe, placeOrderRazorpay, allOrders, userOrders, updateStatus, deleteOrder, getAdminAnalytics}
+// Cancellation Endpoints
+const requestCancellation = async (req, res) => {
+    try {
+        const { orderId, reason, userId } = req.body;
+        
+        const order = await orderModel.findOne({ _id: orderId, userId });
+        if (!order) {
+            return res.json({ success: false, message: 'Order not found' });
+        }
+
+        const beyondCancellation = ['Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Cancelled', 'Returned'];
+        if (beyondCancellation.includes(order.status)) {
+            return res.json({ success: false, message: 'Cannot cancel order at this stage.' });
+        }
+
+        if (order.cancelStatus !== 'None') {
+            return res.json({ success: false, message: 'Cancellation already requested.' });
+        }
+
+        const now = Date.now();
+        const orderAgeHours = (now - order.date) / (1000 * 60 * 60);
+
+        if (orderAgeHours > 48) {
+            return res.json({ success: false, message: 'Cancellation window has expired (over 48 hours).' });
+        }
+
+        if (orderAgeHours <= 24) {
+            // Window 1: Auto Cancellation
+            const history = order.statusHistory || [];
+            history.push({
+                status: 'Cancelled',
+                timestamp: now,
+                updatedBy: 'Customer',
+                note: `Order cancelled automatically by customer. Reason: ${reason || 'None provided'}`
+            });
+
+            order.status = 'Cancelled';
+            order.cancelStatus = 'Approved';
+            order.cancelReason = reason || '';
+            order.statusHistory = history;
+            order.updatedAt = now;
+            await order.save();
+            
+            // Penalty logic for cancellation
+            if (order.userId) {
+                const user = await userModel.findById(order.userId);
+                if (user && user.karmaScore !== undefined) {
+                    await userModel.findByIdAndUpdate(order.userId, { karmaScore: Math.max(0, user.karmaScore - 20) });
+                }
+            }
+
+            return res.json({ success: true, message: 'Order has been successfully cancelled.' });
+        } else {
+            // Window 2: 24 - 48 hours (Needs Admin Approval)
+            order.cancelStatus = 'Requested';
+            order.cancelReason = reason || '';
+            await order.save();
+            return res.json({ success: true, message: 'Cancellation request submitted. Pending admin approval.' });
+        }
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+const approveCancellation = async (req, res) => {
+    try {
+        const { orderId } = req.body;
+        
+        const order = await orderModel.findById(orderId);
+        if (!order || order.cancelStatus !== 'Requested') {
+            return res.json({ success: false, message: 'Valid cancellation request not found.' });
+        }
+
+        const beyondCancellation = ['Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Cancelled', 'Returned'];
+        if (beyondCancellation.includes(order.status)) {
+            // Auto-reject if the order has progressed too far while waiting for admin
+            order.cancelStatus = 'Rejected';
+            await order.save();
+            return res.json({ success: false, message: 'Order has already progressed to shipping. Cancellation automatically rejected.' });
+        }
+
+        const now = Date.now();
+        const history = order.statusHistory || [];
+        history.push({
+            status: 'Cancelled',
+            timestamp: now,
+            updatedBy: 'Admin',
+            note: 'Cancellation request approved by admin.'
+        });
+
+        order.status = 'Cancelled';
+        order.cancelStatus = 'Approved';
+        order.statusHistory = history;
+        order.updatedAt = now;
+
+        await order.save();
+
+        // Penalty logic for cancellation
+        if (order.userId) {
+            const user = await userModel.findById(order.userId);
+            if (user && user.karmaScore !== undefined) {
+                await userModel.findByIdAndUpdate(order.userId, { karmaScore: Math.max(0, user.karmaScore - 20) });
+            }
+        }
+
+        res.json({ success: true, message: 'Cancellation approved.' });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+const rejectCancellation = async (req, res) => {
+    try {
+        const { orderId } = req.body;
+        
+        const order = await orderModel.findById(orderId);
+        if (!order || order.cancelStatus !== 'Requested') {
+            return res.json({ success: false, message: 'Valid cancellation request not found.' });
+        }
+
+        order.cancelStatus = 'Rejected';
+        await order.save();
+
+        res.json({ success: true, message: 'Cancellation request rejected.' });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+export {verifyRazorpay, verifyStripe ,placeOrder, placeOrderStripe, placeOrderRazorpay, allOrders, userOrders, updateStatus, deleteOrder, getAdminAnalytics, requestCancellation, approveCancellation, rejectCancellation}

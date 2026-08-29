@@ -17,7 +17,9 @@ const orderSchema = new mongoose.Schema({
     couponCode: { type: String, default: '' },
     couponDiscount: { type: Number, default: 0 },
     date: { type: Number, required: true },
-    updatedAt: { type: Number, default: Date.now }
+    updatedAt: { type: Number, default: Date.now },
+    cancelStatus: { type: String, default: 'None', enum: ['None', 'Requested', 'Approved', 'Rejected'] },
+    cancelReason: { type: String, default: '' }
 })
 
 const orderModel = mongoose.models.order || mongoose.model('order', orderSchema)

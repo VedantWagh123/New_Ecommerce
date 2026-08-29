@@ -19,6 +19,7 @@ import {
     getInventory,
     updateStock,
     getAnalytics,
+    getAdvancedProductAnalytics,
     getEarnings,
     requestPayout,
     getSellerReviews,
@@ -57,6 +58,7 @@ sellerRouter.get('/inventory', sellerAuth, getInventory);
 sellerRouter.post('/inventory/update', sellerAuth, updateStock);
 
 sellerRouter.get('/analytics', sellerAuth, getAnalytics);
+sellerRouter.get('/analytics/advanced', sellerAuth, getAdvancedProductAnalytics);
 
 sellerRouter.get('/earnings', sellerAuth, getEarnings);
 sellerRouter.post('/earnings/payout', sellerAuth, requestPayout);

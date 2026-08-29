@@ -119,9 +119,23 @@ const Product = () => {
     }
   };
 
+  const trackProductView = async () => {
+    try {
+      await axios.post(`${backendUrl}/api/product/track-event`, {
+        productId,
+        eventType: 'VIEW'
+      }, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+    } catch (err) {
+      console.warn("Analytics Error:", err);
+    }
+  };
+
   useEffect(() => {
     fetchProductData();
     fetchReviews();
+    trackProductView();
   }, [productId, products]);
 
   useEffect(() => {

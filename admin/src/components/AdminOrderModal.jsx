@@ -46,7 +46,7 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto print:absolute print:inset-auto print:bg-white print:p-0 print:overflow-visible print:h-auto print:block">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-gray-900/20 animate-fade-in overflow-y-auto print:absolute print:inset-auto print:bg-white print:p-0 print:overflow-visible print:h-auto print:block">
             
             {/* Printable Invoice Section (Only visible when printing) */}
             <div className="hidden print:block print-invoice-section bg-white p-10 w-full font-sans text-gray-900 absolute top-0 left-0 min-h-screen z-[99999]">
@@ -180,85 +180,6 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
 
                 {/* Modal Body */}
                 <div className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 bg-white">
-                    {/* Status Update Action Control */}
-                    <div className="p-4 sm:p-5 bg-gray-50 border border-gray-200/90 rounded-2xl space-y-3">
-                        <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Fulfillment Status Management</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                            <div className="sm:col-span-5">
-                                <label className="text-xs text-gray-500 block mb-1 font-semibold">Target Status</label>
-                                <select
-                                    value={selectedStatus}
-                                    onChange={(e) => setSelectedStatus(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-black bg-white cursor-pointer"
-                                >
-                                    {ALL_STATUSES.map((st) => (
-                                        <option key={st} value={st}>
-                                            {st}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="sm:col-span-7">
-                                <label className="text-xs text-gray-500 block mb-1 font-semibold">Courier Tracking Note / AWB Number (Optional)</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. Handed over to BlueDart courier AWB #92019"
-                                    value={note}
-                                    onChange={(e) => setNote(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-black bg-white"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end pt-1">
-                            <button
-                                type="button"
-                                disabled={isUpdating || (selectedStatus === status && !note)}
-                                onClick={() => setShowConfirmModal(true)}
-                                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs ${
-                                    isUpdating || (selectedStatus === status && !note)
-                                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                        : 'bg-black hover:bg-gray-800 text-white cursor-pointer active:scale-95'
-                                }`}
-                            >
-                                {isUpdating ? 'Updating Status...' : 'Apply Status Update'}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Progress Stepper View */}
-                    <div className="p-4 sm:p-5 bg-white border border-gray-200/80 rounded-2xl shadow-2xs">
-                        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Customer Stepper Progress View</h3>
-                        <div className="flex items-center justify-between relative px-2">
-                            <div className="absolute top-4 left-6 right-6 h-1 bg-gray-200 -z-0" />
-                            <div 
-                                className="absolute top-4 left-6 h-1 bg-emerald-500 transition-all duration-500 -z-0"
-                                style={{ width: `${Math.max(0, Math.min(100, (currentStepIndex / (STATUS_STEPS.length - 1)) * 92))}%` }}
-                            />
-                            {STATUS_STEPS.map((stepName, idx) => {
-                                const isPassed = currentStepIndex > idx;
-                                const isCurrent = currentStepIndex === idx;
-
-                                return (
-                                    <div key={stepName} className="flex flex-col items-center relative z-10 w-20 text-center">
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-transform ${
-                                            isPassed 
-                                                ? 'bg-emerald-500 text-white shadow-xs' 
-                                                : isCurrent 
-                                                ? 'bg-black text-white ring-4 ring-gray-200 scale-110 shadow-md' 
-                                                : 'bg-white border-2 border-gray-300 text-gray-400'
-                                        }`}>
-                                            {isPassed ? '✓' : idx + 1}
-                                        </div>
-                                        <span className={`text-[11px] mt-2 font-bold ${isCurrent ? 'text-black' : isPassed ? 'text-emerald-700' : 'text-gray-400'}`}>
-                                            {stepName}
-                                        </span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-
                     {/* Shipping Address & Financial Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="p-4 border border-gray-200/80 rounded-2xl bg-gray-50/50 text-xs text-gray-700 space-y-1.5">
@@ -290,27 +211,6 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
                         </div>
                     </div>
 
-                    {/* Status History Audit Log */}
-                    {statusHistory && statusHistory.length > 0 && (
-                        <div className="border border-gray-200/80 rounded-2xl p-4 bg-white">
-                            <h4 className="font-bold text-gray-900 text-xs uppercase tracking-wider mb-3">Status Audit History ({statusHistory.length})</h4>
-                            <div className="space-y-2 max-h-40 overflow-y-auto">
-                                {statusHistory.map((h, i) => (
-                                    <div key={i} className="text-xs p-3 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-start">
-                                        <div>
-                                            <span className="font-bold text-gray-900">{h.status}</span>
-                                            <span className="text-gray-400 text-[11px] ml-2">by {h.updatedBy || 'Admin'}</span>
-                                            {h.note && <p className="text-gray-600 mt-1 italic">"{h.note}"</p>}
-                                        </div>
-                                        <span className="text-[11px] text-gray-400 font-mono shrink-0 ml-2">
-                                            {new Date(h.timestamp).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
                     {/* Order Product Items */}
                     <div className="border border-gray-200/80 rounded-2xl p-4 bg-white">
                         <h4 className="font-bold text-gray-900 text-xs uppercase tracking-wider mb-3">Purchased Items ({items.length})</h4>
@@ -335,13 +235,127 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
                             ))}
                         </div>
                     </div>
+
+                    {/* Status Update Action Control */}
+                    <div className="p-4 sm:p-5 bg-gray-50 border border-gray-200/90 rounded-2xl space-y-3">
+                        <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Fulfillment Status Management</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                            <div className="sm:col-span-5">
+                                <label className="text-xs text-gray-500 block mb-1 font-semibold">Target Status</label>
+                                {['Packing', 'Accepted'].includes(status) ? (
+                                    <div className="w-full border border-gray-200 bg-gray-50 rounded-xl p-2.5 text-xs font-bold text-gray-500 text-center uppercase tracking-wider">
+                                        Pending Seller Acceptance
+                                    </div>
+                                ) : (
+                                    <select
+                                        value={selectedStatus}
+                                        onChange={(e) => setSelectedStatus(e.target.value)}
+                                        disabled={order.cancelStatus === 'Requested'}
+                                        className="w-full border border-gray-300 rounded-xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-black bg-white cursor-pointer disabled:opacity-50"
+                                    >
+                                        <option value={status}>{status}</option>
+                                        {['Packed', 'Ready to Ship', 'Handed to Logistics', 'Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled']
+                                          .slice(['Packed', 'Ready to Ship', 'Handed to Logistics', 'Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled'].indexOf(status) + 1)
+                                          .map((st) => (
+                                            <option key={st} value={st}>
+                                                {st}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
+                                {order.cancelStatus === 'Requested' && (
+                                    <p className="text-[10px] text-rose-600 font-bold mt-1">Pending cancellation request.</p>
+                                )}
+                            </div>
+                            <div className="sm:col-span-7">
+                                <label className="text-xs text-gray-500 block mb-1 font-semibold">Courier Tracking Note / AWB Number (Optional)</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Handed over to BlueDart courier AWB #92019"
+                                    value={note}
+                                    onChange={(e) => setNote(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-black bg-white"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end pt-1">
+                            <button
+                                type="button"
+                                disabled={isUpdating || (selectedStatus === status && !note)}
+                                onClick={() => setShowConfirmModal(true)}
+                                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs ${
+                                    isUpdating || (selectedStatus === status && !note)
+                                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                        : 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer active:scale-95'
+                                }`}
+                            >
+                                {isUpdating ? 'Updating Status...' : 'Apply Status Update'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Progress Stepper View */}
+                    <div className="p-4 sm:p-5 bg-white border border-gray-200/80 rounded-2xl shadow-2xs">
+                        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Customer Stepper Progress View</h3>
+                        <div className="flex items-center justify-between relative px-2">
+                            <div className="absolute top-4 left-6 right-6 h-1 bg-gray-200 -z-0" />
+                            <div 
+                                className="absolute top-4 left-6 h-1 bg-emerald-500 transition-all duration-500 -z-0"
+                                style={{ width: `${Math.max(0, Math.min(100, (currentStepIndex / (STATUS_STEPS.length - 1)) * 92))}%` }}
+                            />
+                            {STATUS_STEPS.map((stepName, idx) => {
+                                const isDeliveredStep = stepName === 'Delivered';
+                                const isPassed = currentStepIndex > idx || (isDeliveredStep && currentStepIndex === idx);
+                                const isCurrent = currentStepIndex === idx && !isDeliveredStep;
+
+                                return (
+                                    <div key={stepName} className="flex flex-col items-center relative z-10 w-20 text-center">
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-transform ${
+                                            isPassed 
+                                                ? 'bg-emerald-500 text-white shadow-xs' 
+                                                : isCurrent 
+                                                ? 'bg-white text-indigo-600 border-2 border-indigo-500 ring-4 ring-indigo-50 scale-110 shadow-md animate-pulse' 
+                                                : 'bg-white border-2 border-gray-300 text-gray-400'
+                                        }`}>
+                                            {isPassed ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg> : idx + 1}
+                                        </div>
+                                        <span className={`text-[11px] mt-2 font-bold ${isCurrent ? 'text-indigo-700' : isPassed ? 'text-emerald-700' : 'text-gray-400'}`}>
+                                            {stepName}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Status History Audit Log */}
+                    {statusHistory && statusHistory.length > 0 && (
+                        <div className="border border-gray-200/80 rounded-2xl p-4 bg-white">
+                            <h4 className="font-bold text-gray-900 text-xs uppercase tracking-wider mb-3">Status Audit History ({statusHistory.length})</h4>
+                            <div className="space-y-2 max-h-40 overflow-y-auto">
+                                {statusHistory.map((h, i) => (
+                                    <div key={i} className="text-xs p-3 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-start">
+                                        <div>
+                                            <span className="font-bold text-gray-900">{h.status}</span>
+                                            <span className="text-gray-400 text-[11px] ml-2">by {h.updatedBy || 'Admin'}</span>
+                                            {h.note && <p className="text-gray-600 mt-1 italic">"{h.note}"</p>}
+                                        </div>
+                                        <span className="text-[11px] text-gray-400 font-mono shrink-0 ml-2">
+                                            {new Date(h.timestamp).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer */}
                 <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end shrink-0">
                     <button
                         onClick={onClose}
-                        className="bg-black hover:bg-gray-800 text-white font-bold px-6 py-2.5 rounded-xl text-xs transition-colors shadow-xs"
+                        className="bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-bold px-6 py-2.5 rounded-xl text-xs transition-colors shadow-xs"
                     >
                         Close Details
                     </button>

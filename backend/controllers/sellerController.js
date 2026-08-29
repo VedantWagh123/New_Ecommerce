@@ -564,9 +564,28 @@ const updateSellerOrderStatus = async (req, res) => {
             return res.json({ success: false, message: "Order not found or unauthorized" });
         }
 
-        const validStatuses = ['Packing', 'Shipped', 'Out for Delivery', 'Delivered'];
-        if (!validStatuses.includes(status)) {
-            return res.json({ success: false, message: "Invalid order status transition" });
+        if (order.cancelStatus === 'Requested') {
+            return res.json({ success: false, message: "Cannot update status while a cancellation request is pending." });
+        }
+
+        const validSellerStatuses = ['Packing', 'Accepted', 'Packed', 'Ready to Ship', 'Handed to Logistics'];
+        const currentStatusIdx = validSellerStatuses.indexOf(order.status);
+        const nextStatusIdx = validSellerStatuses.indexOf(status);
+
+        if (currentStatusIdx === -1) {
+            return res.json({ success: false, message: `Order has passed seller control (Current Status: ${order.status})` });
+        }
+
+        if (nextStatusIdx === -1) {
+            return res.json({ success: false, message: "Sellers cannot set Admin/Logistics statuses manually." });
+        }
+
+        if (nextStatusIdx <= currentStatusIdx) {
+            return res.json({ success: false, message: "Cannot move order status backwards." });
+        }
+
+        if (nextStatusIdx !== currentStatusIdx + 1) {
+            return res.json({ success: false, message: `Invalid transition. Next valid status is: ${validSellerStatuses[currentStatusIdx + 1]}` });
         }
 
         const now = Date.now();
@@ -692,6 +711,205 @@ const getAnalytics = async (req, res) => {
         });
 
     } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+// 9.5 Advanced Seller Product Analytics
+const getAdvancedProductAnalytics = async (req, res) => {
+    try {
+        const sellerId = req.sellerId;
+        const { startDate, endDate, compStartDate, compEndDate } = req.query;
+
+        // Helper to run pipeline for a given date range
+        const getMetricsForRange = async (start, end) => {
+            const startNum = Number(start);
+            const endNum = Number(end);
+            
+            const productEventModel = (await import('../models/productEventModel.js')).default;
+            const orderModel = (await import('../models/orderModel.js')).default;
+
+            // 1. Get Views and Add to Cart
+            const events = await productEventModel.aggregate([
+                { 
+                    $match: { 
+                        sellerId, 
+                        timestamp: { $gte: startNum, $lte: endNum }
+                    } 
+                },
+                {
+                    $group: {
+                        _id: "$eventType",
+                        count: { $sum: 1 }
+                    }
+                }
+            ]);
+
+            const views = events.find(e => e._id === 'VIEW')?.count || 0;
+            const carts = events.find(e => e._id === 'ADD_TO_CART')?.count || 0;
+
+            // 2. Get Orders, Revenue, Units Sold
+            const orders = await orderModel.find({ 
+                "items.sellerId": sellerId,
+                date: { $gte: startNum, $lte: endNum }
+            });
+
+            let revenue = 0;
+            let unitsSold = 0;
+            let totalOrders = orders.length;
+
+            orders.forEach(order => {
+                const sellerItems = order.items.filter(i => i.sellerId === sellerId);
+                sellerItems.forEach(item => {
+                    unitsSold += item.quantity;
+                    if (order.status === 'Delivered') {
+                        revenue += (item.price * item.quantity);
+                    }
+                });
+            });
+
+            return { views, carts, orders: totalOrders, revenue, unitsSold };
+        };
+
+        const getTrendsForRange = async (start, end, orderList) => {
+            const startNum = Number(start);
+            const endNum = Number(end);
+            const productEventModel = (await import('../models/productEventModel.js')).default;
+            const trendsMap = {};
+            const allEvents = await productEventModel.find({
+                sellerId,
+                timestamp: { $gte: startNum, $lte: endNum }
+            });
+            
+            allEvents.forEach(e => {
+                const dateStr = new Date(e.timestamp).toLocaleDateString('default', { month: 'short', day: 'numeric' });
+                if (!trendsMap[dateStr]) trendsMap[dateStr] = { date: dateStr, views: 0, carts: 0, revenue: 0, unitsSold: 0, timestamp: e.timestamp };
+                if (e.eventType === 'VIEW') trendsMap[dateStr].views += 1;
+                if (e.eventType === 'ADD_TO_CART') trendsMap[dateStr].carts += 1;
+            });
+
+            orderList.forEach(order => {
+                const dateStr = new Date(order.date).toLocaleDateString('default', { month: 'short', day: 'numeric' });
+                if (!trendsMap[dateStr]) trendsMap[dateStr] = { date: dateStr, views: 0, carts: 0, revenue: 0, unitsSold: 0, timestamp: order.date };
+                const sellerItems = order.items.filter(i => i.sellerId === sellerId);
+                sellerItems.forEach(item => {
+                    trendsMap[dateStr].unitsSold += item.quantity;
+                    if (order.status === 'Delivered') {
+                        trendsMap[dateStr].revenue += (item.price * item.quantity);
+                    }
+                });
+            });
+
+            return Object.values(trendsMap).sort((a, b) => a.timestamp - b.timestamp);
+        };
+
+        const current = await getMetricsForRange(startDate, endDate);
+        let comparison = null;
+        let compOrdersList = [];
+        if (compStartDate && compEndDate) {
+            comparison = await getMetricsForRange(compStartDate, compEndDate);
+            const orderModel = (await import('../models/orderModel.js')).default;
+            compOrdersList = await orderModel.find({ 
+                "items.sellerId": sellerId,
+                date: { $gte: Number(compStartDate), $lte: Number(compEndDate) }
+            });
+        }
+
+        // Product level metrics
+        const productEventModel = (await import('../models/productEventModel.js')).default;
+        const productEvents = await productEventModel.aggregate([
+            { 
+                $match: { 
+                    sellerId, 
+                    timestamp: { $gte: Number(startDate), $lte: Number(endDate) }
+                } 
+            },
+            {
+                $group: {
+                    _id: { productId: "$productId", eventType: "$eventType" },
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+
+        const productMetricsMap = {};
+        productEvents.forEach(e => {
+            const pid = e._id.productId;
+            if (!productMetricsMap[pid]) productMetricsMap[pid] = { views: 0, carts: 0, unitsSold: 0, revenue: 0, orders: 0 };
+            if (e._id.eventType === 'VIEW') productMetricsMap[pid].views = e.count;
+            if (e._id.eventType === 'ADD_TO_CART') productMetricsMap[pid].carts = e.count;
+        });
+
+        const currentOrdersList = await orderModel.find({ 
+            "items.sellerId": sellerId,
+            date: { $gte: Number(startDate), $lte: Number(endDate) }
+        });
+
+        currentOrdersList.forEach(order => {
+            const sellerItems = order.items.filter(i => i.sellerId === sellerId);
+            const uniqueProductIdsInOrder = new Set(sellerItems.map(i => i._id || i.name));
+            
+            sellerItems.forEach(item => {
+                const pid = item._id || item.name;
+                if (!productMetricsMap[pid]) productMetricsMap[pid] = { views: 0, carts: 0, unitsSold: 0, revenue: 0, orders: 0 };
+                productMetricsMap[pid].unitsSold += item.quantity;
+                if (order.status === 'Delivered') {
+                    productMetricsMap[pid].revenue += (item.price * item.quantity);
+                }
+            });
+            
+            uniqueProductIdsInOrder.forEach(pid => {
+                if (productMetricsMap[pid]) {
+                    productMetricsMap[pid].orders += 1;
+                }
+            });
+        });
+
+        // Merge with product details
+        const productsList = await productModel.find({ sellerId });
+        const productPerformance = productsList.map(p => {
+            const pid = p._id.toString();
+            const metrics = productMetricsMap[pid] || { views: 0, carts: 0, unitsSold: 0, revenue: 0, orders: 0 };
+            const stockValues = Object.values(p.stock || {});
+            const totalStock = stockValues.reduce((a, b) => a + Number(b), 0);
+            
+            let badge = 'Average';
+            const conv = metrics.views > 0 ? (metrics.orders / metrics.views) : 0;
+            if (metrics.revenue > 1000 && conv > 0.05) badge = 'Excellent';
+            else if (metrics.revenue > 0) badge = 'Good';
+            else if (metrics.views > 100 && metrics.orders === 0) badge = 'Needs Attention';
+
+            return {
+                id: pid,
+                name: p.name,
+                image: p.image?.[0] || '',
+                price: p.price,
+                category: p.category,
+                stock: totalStock,
+                ...metrics,
+                conversionRate: conv * 100,
+                cartRate: metrics.views > 0 ? (metrics.carts / metrics.views) * 100 : 0,
+                badge
+            };
+        });
+
+        // Trends 
+        const trends = await getTrendsForRange(startDate, endDate, currentOrdersList);
+        let compTrends = [];
+        if (compStartDate && compEndDate) {
+            compTrends = await getTrendsForRange(compStartDate, compEndDate, compOrdersList);
+        }
+
+        res.json({
+            success: true,
+            current,
+            comparison,
+            productPerformance,
+            trends,
+            compTrends
+        });
+    } catch (error) {
+        console.error("Advanced Analytics Error:", error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -840,6 +1058,7 @@ export {
     getInventory,
     updateStock,
     getAnalytics,
+    getAdvancedProductAnalytics,
     getEarnings,
     requestPayout,
     getSellerReviews,

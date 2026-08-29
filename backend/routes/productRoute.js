@@ -1,5 +1,5 @@
 import express from 'express'
-import { listProducts, addProduct, removeProduct, singleProduct, getAllProductsAdmin, getPendingProducts, approveProduct, rejectProduct } from '../controllers/productController.js'
+import { listProducts, addProduct, removeProduct, singleProduct, getAllProductsAdmin, getPendingProducts, approveProduct, rejectProduct, trackProductEvent } from '../controllers/productController.js'
 import upload from '../middleware/multer.js';
 import adminAuth from '../middleware/adminAuth.js';
 import roleAuth from '../middleware/roleAuth.js';
@@ -10,6 +10,7 @@ productRouter.post('/add',adminAuth,roleAuth(['super_admin']),upload.fields([{na
 productRouter.post('/remove',adminAuth,roleAuth(['super_admin']),removeProduct);
 productRouter.post('/single',singleProduct);
 productRouter.get('/list',listProducts)
+productRouter.post('/track-event', trackProductEvent);
 
 // Admin product approval routes
 productRouter.get('/admin-list', adminAuth, roleAuth(['super_admin']), getAllProductsAdmin);

@@ -1,7 +1,12 @@
 export const ORDER_STATUS = {
     PACKING: 'Packing',
+    ACCEPTED: 'Accepted',
+    PACKED: 'Packed',
+    READY_TO_SHIP: 'Ready to Ship',
+    HANDED_TO_LOGISTICS: 'Handed to Logistics',
     SHIPPED: 'Shipped',
-    OUT_FOR_DELIVERY: 'Out for delivery',
+    IN_TRANSIT: 'In Transit',
+    OUT_FOR_DELIVERY: 'Out for Delivery',
     DELIVERED: 'Delivered',
     CANCELLED: 'Cancelled',
     DELIVERY_FAILED: 'Delivery Failed',
@@ -11,26 +16,19 @@ export const ORDER_STATUS = {
 
 export const STATUS_STEPS = [
     ORDER_STATUS.PACKING,
+    ORDER_STATUS.ACCEPTED,
+    ORDER_STATUS.PACKED,
+    ORDER_STATUS.READY_TO_SHIP,
+    ORDER_STATUS.HANDED_TO_LOGISTICS,
     ORDER_STATUS.SHIPPED,
+    ORDER_STATUS.IN_TRANSIT,
     ORDER_STATUS.OUT_FOR_DELIVERY,
     ORDER_STATUS.DELIVERED
 ];
 
 export const getStatusStepIndex = (status) => {
-    switch (status) {
-        case ORDER_STATUS.PACKING:
-        case 'Order Placed':
-        case 'Placed':
-            return 0;
-        case ORDER_STATUS.SHIPPED:
-            return 1;
-        case ORDER_STATUS.OUT_FOR_DELIVERY:
-            return 2;
-        case ORDER_STATUS.DELIVERED:
-            return 3;
-        default:
-            return -1; // Exception/Terminal states
-    }
+    const index = STATUS_STEPS.indexOf(status);
+    return index !== -1 ? index : -1;
 };
 
 export const getStatusBadgeStyle = (status) => {
@@ -38,7 +36,13 @@ export const getStatusBadgeStyle = (status) => {
         case ORDER_STATUS.PACKING:
         case 'Order Placed':
             return 'bg-blue-50 text-blue-700 border-blue-200';
+        case ORDER_STATUS.ACCEPTED:
+        case ORDER_STATUS.PACKED:
+        case ORDER_STATUS.READY_TO_SHIP:
+        case ORDER_STATUS.HANDED_TO_LOGISTICS:
+            return 'bg-purple-50 text-purple-700 border-purple-200';
         case ORDER_STATUS.SHIPPED:
+        case ORDER_STATUS.IN_TRANSIT:
             return 'bg-indigo-50 text-indigo-700 border-indigo-200';
         case ORDER_STATUS.OUT_FOR_DELIVERY:
             return 'bg-amber-50 text-amber-700 border-amber-200';

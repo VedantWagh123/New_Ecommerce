@@ -1,6 +1,6 @@
 import { v2 as cloudinary } from "cloudinary"
 import productModel from "../models/productModel.js"
-
+import productEventModel from "../models/productEventModel.js"
 import userModel from "../models/userModel.js"
 
 // Helper to populate storeName on products
@@ -197,4 +197,52 @@ const rejectProduct = async (req, res) => {
     }
 };
 
-export { listProducts, addProduct, removeProduct, singleProduct, getAllProductsAdmin, getPendingProducts, approveProduct, rejectProduct }
+// Track Product Events (Views, Add to Cart)
+const trackProductEvent = async (req, res) => {
+    try {
+        const { productId, eventType } = req.body;
+        
+        if (!['VIEW', 'ADD_TO_CART'].includes(eventType)) {
+            return res.json({ success: false, message: "Invalid event type" });
+        }
+
+        const product = await productModel.findById(productId).select('sellerId');
+        if (!product) {
+            return res.json({ success: false, message: "Product not found" });
+        }
+
+        // Only track for seller products, or 'admin' for official products
+        const sellerId = product.sellerId || 'admin';
+
+        // Extract user ID if provided by frontend via auth headers (optional)
+        // If not, it defaults to null
+        let userId = null;
+        if (req.headers.authorization) {
+            try {
+                const jwt = await import('jsonwebtoken');
+                const token = req.headers.authorization.split(' ')[1];
+                const decoded = jwt.default.verify(token, process.env.JWT_SECRET);
+                userId = decoded.id;
+            } catch (e) {
+                // Ignore token errors for event tracking
+            }
+        }
+
+        const event = new productEventModel({
+            productId,
+            sellerId,
+            userId,
+            eventType,
+            timestamp: Date.now()
+        });
+
+        await event.save();
+
+        res.json({ success: true });
+    } catch (error) {
+        console.log("Track Event Error:", error);
+        res.json({ success: false, message: error.message });
+    }
+};
+
+export { listProducts, addProduct, removeProduct, singleProduct, getAllProductsAdmin, getPendingProducts, approveProduct, rejectProduct, trackProductEvent }

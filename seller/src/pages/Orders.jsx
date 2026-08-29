@@ -148,18 +148,43 @@ const Orders = ({ token, searchQuery }) => {
 
                 {/* Permitted Status Update Dropdown */}
                 <div className="flex items-center gap-3 self-end lg:self-center">
-                  <span className="text-xs font-bold text-slate-500">Update Order Status:</span>
-                  <select
-                    value={order.status}
-                    onChange={(e) => handleStatusUpdate(order._id, e.target.value)}
-                    disabled={updatingId === order._id}
-                    className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-slate-900 cursor-pointer disabled:opacity-50"
-                  >
-                    <option value="Packing">Packing</option>
-                    <option value="Shipped">Shipped</option>
-                    <option value="Out for Delivery">Out for Delivery</option>
-                    <option value="Delivered">Delivered</option>
-                  </select>
+                  {order.cancelStatus === 'Requested' ? (
+                     <span className="text-xs font-bold text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200">
+                        Cancel Requested
+                     </span>
+                  ) : (() => {
+                     const SELLER_STATUSES = ['Packing', 'Accepted', 'Packed', 'Ready to Ship', 'Handed to Logistics'];
+                     const currentIdx = SELLER_STATUSES.indexOf(order.status);
+                     
+                     if (currentIdx === -1) {
+                         // Beyond seller control
+                         return (
+                            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                               {order.status} (Admin Control)
+                            </span>
+                         );
+                     } else if (currentIdx === SELLER_STATUSES.length - 1) {
+                         return (
+                            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                               {order.status}
+                            </span>
+                         );
+                     } else {
+                         const nextStatus = SELLER_STATUSES[currentIdx + 1];
+                         return (
+                            <>
+                               <span className="text-xs font-bold text-slate-500">Next Step:</span>
+                               <button
+                                 onClick={() => handleStatusUpdate(order._id, nextStatus)}
+                                 disabled={updatingId === order._id}
+                                 className="px-4 py-1.5 bg-black hover:bg-slate-800 text-white border border-transparent rounded-xl text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                               >
+                                 {updatingId === order._id ? 'Updating...' : `Mark as ${nextStatus}`}
+                               </button>
+                            </>
+                         );
+                     }
+                  })()}
 
                   <button
                     onClick={() => setSelectedOrder(order)}
