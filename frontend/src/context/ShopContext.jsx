@@ -1,4 +1,4 @@
-import { createContext, useEffect, useState } from "react";
+import { createContext, useEffect, useState, useRef } from "react";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import axios from 'axios'
@@ -18,6 +18,47 @@ const ShopContextProvider = (props) => {
     const [token, setToken] = useState('')
     const [couponData, setCouponData] = useState({ code: '', discount: 0 });
     const navigate = useNavigate();
+
+    const [nluSearchResult, setNluSearchResult] = useState(null);
+    const [isNluSearching, setIsNluSearching] = useState(false);
+    const nluAbortControllerRef = useRef(null);
+
+    const fetchNluSearch = async (query) => {
+        if (!query.trim()) {
+            setNluSearchResult(null);
+            return;
+        }
+
+        // Cancel previous request
+        if (nluAbortControllerRef.current) {
+            nluAbortControllerRef.current.abort();
+        }
+        nluAbortControllerRef.current = new AbortController();
+
+        setIsNluSearching(true);
+        try {
+            const response = await axios.post(
+                backendUrl + '/api/ai/nlu-search',
+                { query },
+                { signal: nluAbortControllerRef.current.signal }
+            );
+
+            if (response.data.success) {
+                setNluSearchResult({ query, products: response.data.products });
+            } else {
+                setNluSearchResult(null);
+            }
+        } catch (error) {
+            if (axios.isCancel(error)) {
+                console.log('NLU search request canceled for:', query);
+            } else {
+                console.error('NLU search error:', error);
+                setNluSearchResult(null);
+            }
+        } finally {
+            setIsNluSearching(false);
+        }
+    };
 
 
     const [savedForLater, setSavedForLater] = useState(() => {
@@ -515,7 +556,8 @@ const ShopContextProvider = (props) => {
         sellerStatus, fetchSellerStatus,
         vipStatus, vipSubscription, fetchVipStatus,
         couponData, setCouponData, applyCouponCode,
-        karmaScore, setKarmaScore
+        karmaScore, setKarmaScore,
+        nluSearchResult, setNluSearchResult, isNluSearching, fetchNluSearch
     }
 
     return (

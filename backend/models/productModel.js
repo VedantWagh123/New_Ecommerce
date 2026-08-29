@@ -52,4 +52,9 @@ const productSchema = new mongoose.Schema({
 
 const productModel = mongoose.models.product || mongoose.model("product", productSchema);
 
+// Optimize database queries for search
+productSchema.index({ category: 1 });
+productSchema.index({ subCategory: 1 });
+productSchema.index({ price: 1 });
+
 export default productModel;

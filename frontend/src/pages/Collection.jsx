@@ -19,7 +19,7 @@ const ALL_CATEGORIES = [
 ];
 
 const Collection = () => {
-  const { products, search, showSearch } = useContext(ShopContext);
+  const { products, search, showSearch, nluSearchResult } = useContext(ShopContext);
   const location = useLocation();
   const [showFilter, setShowFilter] = useState(false);
   const [filterProducts, setFilterProducts] = useState([]);
@@ -57,9 +57,13 @@ const Collection = () => {
   const applyFilter = () => {
     let productsCopy = products.slice();
 
-    // Search input filter
+    // Search input filter with NLU fallback
     if (showSearch && search) {
-      productsCopy = productsCopy.filter(item => item.name.toLowerCase().includes(search.toLowerCase()));
+      if (nluSearchResult && nluSearchResult.query === search) {
+        productsCopy = nluSearchResult.products.slice();
+      } else {
+        productsCopy = productsCopy.filter(item => item.name.toLowerCase().includes(search.toLowerCase()));
+      }
     }
 
     // Category filter (Strict category matching so Men, Women, & Kids sections stay 100% separated)

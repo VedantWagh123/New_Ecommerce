@@ -525,3 +525,123 @@ export const visualSearch = async (req, res) => {
     });
   }
 };
+
+// In-memory cache for NLU Search to optimize repetitive queries
+const nluCache = new Map();
+
+/**
+ * Natural Language Search Endpoint
+ * Extracts intent from query using Ollama and queries DB.
+ */
+export const nluSearch = async (req, res) => {
+  try {
+    const { query } = req.body;
+    
+    if (!query || typeof query !== 'string' || !query.trim()) {
+      return res.status(400).json({ success: false, message: 'Query is required' });
+    }
+
+    const cleanQuery = query.trim();
+    
+    // Check cache
+    if (nluCache.has(cleanQuery)) {
+      console.log(`🧠 NLU Cache hit for: "${cleanQuery}"`);
+      return res.json({ success: true, products: nluCache.get(cleanQuery), cached: true });
+    }
+
+    const modelToUse = process.env.OLLAMA_MODEL || OLLAMA_MODEL;
+    
+    let extractedFilters = null;
+    
+    try {
+      // Fast prompt to extract JSON intent
+      const systemPrompt = `You are a shopping search intent extractor. 
+Extract filters from the user's shopping query. 
+Return ONLY a valid JSON object. Do not include markdown code blocks, just raw JSON.
+Possible keys: 
+- category: (Men, Women, Kids)
+- subCategory: (e.g. shirt, tshirt, jeans, shoes)
+- color: (e.g. black, blue)
+- fit: (e.g. oversized, slim, regular)
+- maxPrice: (number)
+- occasion: (e.g. casual, party, college, formal)
+- brand: (string)
+
+If a key is not applicable, omit it.
+Example query: "blue casual outfit under 2000 for college"
+Example output: {"color": "blue", "occasion": "casual", "maxPrice": 2000}`;
+
+      console.log(`🤖 Requesting NLU extraction for: "${cleanQuery}"`);
+      const response = await callOllama('/api/chat', {
+        model: modelToUse,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: cleanQuery }
+        ],
+        stream: false
+      }, 15000); // Increased timeout to 15s to allow local LLM to process
+      
+      const responseContent = response.data.message.content;
+      
+      // Parse JSON
+      let jsonStr = responseContent;
+      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[0];
+      }
+      extractedFilters = JSON.parse(jsonStr);
+      console.log(`✅ Extracted NLU Filters:`, extractedFilters);
+
+    } catch (error) {
+      console.warn(`⚠️ NLU Extraction failed/timed out. Falling back to simple search. Error: ${error.message}`);
+      // Fallback: silently fail and let the system do normal text scoring search
+      
+      // Smart Regex Fallback for common constraints if LLM fails
+      extractedFilters = {};
+      const priceMatch = cleanQuery.match(/(?:under|below|less than|max)\s*(?:rs|rupees|₹|\$)?\s*(\d+)/i);
+      if (priceMatch) {
+        extractedFilters.maxPrice = Number(priceMatch[1]);
+        console.log(`✅ Regex Fallback extracted maxPrice: ${extractedFilters.maxPrice}`);
+      }
+      
+      const genderMatch = cleanQuery.match(/\b(men|women|boys|girls|kids)\b/i);
+      if (genderMatch) {
+        let g = genderMatch[1].toLowerCase();
+        if (g === 'boys' || g === 'girls') g = 'kids';
+        extractedFilters.category = g.charAt(0).toUpperCase() + g.slice(1);
+      }
+    }
+
+    // Call the existing local DB search service
+    let products = [];
+    if (extractedFilters && Object.keys(extractedFilters).length > 0) {
+      // Use NLU filters + query token scoring for extra accuracy
+      products = await searchProducts({ ...extractedFilters, query: cleanQuery, limit: 10 });
+    } else {
+      // Fallback: normal query search
+      products = await searchProducts({ query: cleanQuery, limit: 10 });
+    }
+    
+    // Cache the result
+    if (products.length > 0) {
+      nluCache.set(cleanQuery, products);
+      // Keep cache size manageable
+      if (nluCache.size > 100) {
+        const firstKey = nluCache.keys().next().value;
+        nluCache.delete(firstKey);
+      }
+    }
+
+    return res.json({
+      success: true,
+      products: products
+    });
+
+  } catch (error) {
+    console.error('NLU Search Error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'NLU Search Error'
+    });
+  }
+};
