@@ -6,7 +6,8 @@ import requests
 from PIL import Image
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from sentence_transformers import SentenceTransformer
+import torchvision.models as models
+import torchvision.transforms as transforms
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
@@ -19,17 +20,26 @@ os.environ["OMP_NUM_THREADS"] = "1"
 torch.set_num_threads(1)
 torch.set_grad_enabled(False) # Disable gradients globally to save memory
 
-# Initialize Model (CLIP)
-MODEL_NAME = 'sentence-transformers/clip-ViT-B-32'
-print(f"Loading model {MODEL_NAME} (optimized for low memory)...")
-model = SentenceTransformer(
-    MODEL_NAME, 
-    model_kwargs={
-        "torch_dtype": torch.bfloat16, # Cuts RAM usage of model weights in half
-        "low_cpu_mem_usage": True      # Prevents memory spike during loading
-    }
-)
+# Initialize Model (ResNet18)
+print("Loading ResNet18 model (optimized for low memory)...")
+model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+model.fc = torch.nn.Identity() # Remove classification layer to get 512-dim embedding
+model.eval() # Set to evaluation mode
 print("Model loaded.")
+
+# Image preprocessing for ResNet18
+preprocess = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+
+def generate_embedding(img: Image.Image) -> list:
+    input_tensor = preprocess(img).unsqueeze(0)
+    with torch.inference_mode():
+        embedding = model(input_tensor).squeeze(0).tolist()
+    return embedding
 
 # Initialize Qdrant client (Cloud or Local)
 QDRANT_URL = os.getenv("QDRANT_URL")
@@ -106,7 +116,7 @@ async def index_product(req: IndexRequest):
     try:
         img = get_image_from_request(req.image_url, req.image_base64)
         # Generate embedding
-        embedding = model.encode(img).tolist()
+        embedding = generate_embedding(img)
         
         point_id = get_product_uuid(req.product_id)
         
@@ -132,14 +142,14 @@ async def search_similar(req: SearchRequest):
     try:
         img = get_image_from_request(req.image_url, req.image_base64)
         # Generate embedding
-        embedding = model.encode(img).tolist()
+        embedding = generate_embedding(img)
         
         # Search Qdrant
-        search_result = client.search(
+        search_result = client.query_points(
             collection_name=COLLECTION_NAME,
-            query_vector=embedding,
+            query=embedding,
             limit=req.limit
-        )
+        ).points
         
         results = []
         for hit in search_result:
@@ -156,4 +166,5 @@ async def search_similar(req: SearchRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Make sure we use only 1 worker to save memory
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)), workers=1)
