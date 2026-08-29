@@ -69,7 +69,7 @@ const Navbar = () => {
     }, []);
 
   return (
-    <div className='flex items-center justify-between py-5 font-medium'>
+    <div className='flex items-center justify-between py-5 font-medium sticky top-0 z-50 bg-white shadow-sm -mx-2 sm:-mx-[5vw] md:-mx-[7vw] lg:-mx-[9vw] px-2 sm:px-[5vw] md:px-[7vw] lg:px-[9vw]'>
       
       <Link to='/' className='flex items-center gap-1'>
           <p className='prata-regular text-3xl font-medium tracking-widest text-black'>VELOURA</p>

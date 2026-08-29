@@ -57,6 +57,7 @@ const AutoBundlerModal = ({ isOpen, onClose, primaryProduct, primarySize }) => {
     }, [isOpen, timeLeft, onClose]);
 
     if (!isOpen || !primaryProduct || bundledProducts.length === 0) return null;
+    const hasTwoBundle = bundledProducts.length >= 2;
 
     const formatTime = (seconds) => {
         const m = Math.floor(seconds / 60);
@@ -120,12 +121,16 @@ const AutoBundlerModal = ({ isOpen, onClose, primaryProduct, primarySize }) => {
 
                         {/* Bundled Items */}
                         <div className="flex gap-4 sm:gap-6 z-10 -mt-2">
+                            {bundledProducts[0] && (
                             <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shadow-xl border-4 border-white group">
                                 <img src={bundledProducts[0].image[0]} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-in-out" alt={bundledProducts[0].name} />
                             </div>
+                            )}
+                            {bundledProducts[1] && (
                             <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shadow-xl border-4 border-white group">
                                 <img src={bundledProducts[1].image[0]} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-in-out" alt={bundledProducts[1].name} />
                             </div>
+                            )}
                         </div>
                     </div>
                 </div>

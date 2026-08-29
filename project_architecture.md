@@ -153,14 +153,89 @@ Ek advanced reverse-image search system jo user ko photo upload karke similar ka
 
 ---
 
+## 🆕 6. Recent Major Upgrades (Aug 2026 Session)
+
+### Upgrade A: Complete Order Lifecycle & Role-Based Status Workflow
+
+**Business Flow Implemented:**
+```
+CUSTOMER: Order Placed
+    ↓
+SELLER:  Accept → Packed → Ready to Ship → Handed to Logistics
+    ↓
+ADMIN:   Shipped → In Transit → Out for Delivery → Delivered
+```
+
+**Backend Changes:**
+- `orderModel.js`: New fields added — `statusHistory[]` (full audit log with timestamps, actor, and note), `cancelStatus`, `cancelReason`, `handedToLogisticsAt`.
+- `orderController.js`: New endpoints — `/cancel/request`, `/cancel/approve`, `/cancel/reject`, `/delete`. Status transition validation enforces role boundaries (Seller cannot set Shipped; Admin cannot set Packed etc.).
+- `sellerController.js` / `sellerRoute.js`: New seller-specific order endpoints — `/api/seller/orders`, `/api/seller/order/status`.
+
+**Admin Panel Changes (`/admin`):**
+- `AdminOrderModal.jsx`: Full redesign — progress stepper (9-step visual timeline), status history audit log, shipping cards, financial summary, proper "Delivered" step shows green checkmark (not number 9). Removed dark blur overlay. Details visible at top without scrolling. Fixed modal positioning bug (removed `animate-fade-in` from outer wrapper that was trapping `fixed` positioning).
+- `Orders.jsx` admin: Details button changed from black block to light bordered button. Customer-grouped view with expandable order history.
+- `orderStatus.js` admin: Shared status constants and badge style helpers.
+
+**Seller Panel Changes (`/seller`):**
+- `Orders.jsx` seller: Full redesign showing only seller's own orders. Role-specific action buttons — Accept, Pack, Ready to Ship, Hand to Logistics. Cannot access Admin-only statuses.
+- `Analytics.jsx` seller: New `ProductAnalytics` component with Recharts-powered charts.
+
+---
+
+### Upgrade B: Customer Order Experience (My Orders Page)
+
+**Frontend Changes (`/frontend`):**
+- `OrderDetailsModal.jsx` **(New Component)**: Production-style order detail modal with:
+  - 8-step visual delivery timeline stepper (Order Placed → Delivered) with timestamps from `statusHistory`
+  - Cancelled order state with reason display
+  - Shipping address card + financial summary (subtotal, platform fee, tax, total)
+  - Itemized order items list with product images
+  - Cancellation flow — auto cancel (≤24h), request cancel (24-48h), expired (>48h)
+  - Review/rating system (Add Review, Edit Review buttons)
+  - Invoice PDF download button
+  - **Live Refresh button** with spinning indicator
+- `Orders.jsx` customer: Replaced basic list with 2-column card grid. Each card shows order ID, status badge, product thumbnails, amount, and "View Order Details" button.
+- `generateInvoicePDF.js` util: Client-side PDF invoice generator.
+- Removed `TrackOrderModal.jsx` (replaced by `OrderDetailsModal`).
+
+---
+
+### Upgrade C: Live Auto-Refresh (Real-time Order Tracking)
+
+- **Smart Polling System** implemented in `Orders.jsx` (customer):
+  - Polls `/api/order/userorders` every **15 seconds** on the list page.
+  - Accelerates to **8 seconds** when the order detail modal is open (user is actively watching).
+  - Pauses automatically when the browser tab is hidden (`document.visibilityState` / Page Visibility API) — saves network & battery.
+  - Resumes and immediately fetches on tab focus.
+- **Stale Closure Fix**: Uses `useRef` (`selectedOrderIdRef`) to always read the latest `selectedOrder._id` inside async callbacks, avoiding React closure staleness bugs.
+- **Modal Auto-Update**: After polling, `setSelectedOrder(updated)` is called with fresh data so the open modal re-renders instantly without user action.
+
+---
+
+### Upgrade D: UI/UX Fixes
+
+| Fix | File | Description |
+|-----|------|-------------|
+| Sticky Navbar | `Navbar.jsx` | Added `sticky top-0 z-50 bg-white shadow-sm` — navbar no longer scrolls away |
+| Filter Sidebar Width | `Collection.jsx` | Shrunk from `min-w-60` (240px) to `w-44` (176px) for better product grid space |
+| Product Blank Screen | `Product.jsx` | Added `productLoading` state + skeleton loader + API fallback (`POST /api/product/single`) for products not yet in context cache |
+| Add to Cart Bug | `Product.jsx` | Fixed inverted button logic — was opening bundler without adding to cart first |
+| AutoBundlerModal Crash | `AutoBundlerModal.jsx` | Added null guards for `bundledProducts[0]` and `bundledProducts[1]` — was crashing for Kids/Accessories category |
+| Admin Modal Positioning | `Orders.jsx` admin | Removed `animate-fade-in` transform from outer wrapper that trapped `fixed` modal positioning |
+| Admin Stepper Step 9 | `AdminOrderModal.jsx` | "Delivered" step now shows green checkmark; was showing number "9" with indigo ring |
+| Refresh Button Fix | `OrderDetailsModal.jsx` | Refresh now awaits API call, spins during load, updates modal data correctly |
+
+---
+
 ## 📂 5. Database Schema (Collections)
 
 1. **`users`**: Saare buyers, sellers, aur admins yahi save hote hain. Unke role (`user`, `seller`, `admin`) ke basis pe unhe alag permissions milti hain. Isme fraud prevention ke liye user ka `karmaScore` bhi store hota hai.
 2. **`products`**: Product details, unka seller kaun hai, approval status, variants (size/color), aur ratings.
-3. **`orders`**: Customer details, kharidi hui items, kis seller ka item hai, payment status, aur delivery timeline.
+3. **`orders`**: Customer details, kharidi hui items, kis seller ka item hai, payment status, delivery timeline. **New:** `statusHistory[]` array (every status change ka full log — status, timestamp, changedBy actor, note), `cancelStatus`, `cancelReason`, `handedToLogisticsAt`.
 4. **`coupons`**: Discount codes, minimum values, category conditions, aur BOGO rules.
 5. **`reviews`**: Customer ke feedbacks.
 6. **`payouts`**: Sellers ki bank withdrawal requests aur unka status (pending/completed).
+7. **`productEvents`** *(New)*: Analytics tracking — product VIEW aur ADD_TO_CART events, used by Seller Analytics dashboard.
 
 ---
-**Summary:** Veloura sirf ek frontend template nahi hai. Ye ek proper backend-driven, scalable ecommerce platform hai jisme strict security, automated math (coupons/earnings), aur hierarchy (Admin -> Seller -> User) properly managed hai!
+**Summary:** Veloura sirf ek frontend template nahi hai. Ye ek proper backend-driven, scalable ecommerce platform hai jisme strict security, automated math (coupons/earnings), hierarchy (Admin → Seller → User), real-time order lifecycle, aur live auto-refresh polling properly managed hai!

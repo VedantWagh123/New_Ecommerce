@@ -8,6 +8,7 @@ import AddReviewModal from './AddReviewModal';
 
 const OrderDetailsModal = ({ isOpen, onClose, order, currency = '$', onRefresh }) => {
     const { backendUrl, token, navigate } = useContext(ShopContext);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     
     // Review Modal State
     const [reviewModalState, setReviewModalState] = useState({
@@ -113,17 +114,20 @@ const OrderDetailsModal = ({ isOpen, onClose, order, currency = '$', onRefresh }
                     </div>
                     <div className="flex items-center gap-2">
                         <button 
-                            onClick={() => {
-                                if (onRefresh) onRefresh();
-                                toast.success("Order status refreshed");
+                            onClick={async () => {
+                                if (isRefreshing) return;
+                                setIsRefreshing(true);
+                                if (onRefresh) await onRefresh();
+                                setIsRefreshing(false);
+                                toast.success("Order status updated!", { autoClose: 1500 });
                             }}
                             className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-colors shadow-xs hover:shadow"
                             title="Refresh Status"
                         >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
-                            <span className="hidden sm:inline">Refresh</span>
+                            <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
                         </button>
                         <button 
                             onClick={() => generateInvoicePDF(order)}

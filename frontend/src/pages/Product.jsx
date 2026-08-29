@@ -20,6 +20,7 @@ const Product = () => {
   } = useContext(ShopContext);
 
   const [productData, setProductData] = useState(false);
+  const [productLoading, setProductLoading] = useState(true);
   const [image, setImage] = useState('');
   const [size, setSize] = useState('');
   const [activeTab, setActiveTab] = useState('specs'); // 'specs' | 'reviews'
@@ -83,6 +84,8 @@ const Product = () => {
   });
 
   const fetchProductData = async () => {
+    setProductLoading(true);
+    // First try from the already-loaded products array (fast)
     const item = products.find((p) => p._id === productId);
     if (item) {
       setProductData(item);
@@ -90,7 +93,27 @@ const Product = () => {
       if (item.sizes && item.sizes.length > 0) {
         setSize(item.sizes[0]);
       }
+      setProductLoading(false);
+      return;
     }
+    // Fallback: fetch directly from API (handles direct URL access, story links etc.)
+    try {
+      const res = await axios.post(`${backendUrl}/api/product/single`, { productId });
+      if (res.data.success && res.data.product) {
+        const p = res.data.product;
+        setProductData(p);
+        setImage(p.image[0]);
+        if (p.sizes && p.sizes.length > 0) {
+          setSize(p.sizes[0]);
+        }
+      } else {
+        setProductData(null); // explicitly null = not found
+      }
+    } catch (err) {
+      console.error('Failed to fetch product:', err);
+      setProductData(null);
+    }
+    setProductLoading(false);
   };
 
   const fetchReviews = async () => {
@@ -494,9 +517,10 @@ const Product = () => {
               <button
                 onClick={() => {
                   if (!size) {
-                    addToCart(productData._id, size);
+                    addToCart(productData._id, size); // will show toast error
                     return;
                   }
+                  addToCart(productData._id, size);
                   setIsBundlerOpen(true);
                 }}
                 className='flex-1 bg-[#ff9f00] hover:bg-amber-600 text-white py-4 rounded-xl text-xs font-bold active:scale-98 transition-all uppercase shadow-md'
@@ -844,7 +868,43 @@ const Product = () => {
         </div>
       )}
     </div>
-  ) : <div className='opacity-0'></div>
+  ) : productLoading ? (
+    // Loading skeleton — shown while fetching product data
+    <div className='border-t-2 pt-10 pb-16 animate-pulse'>
+      <div className='flex gap-12 flex-col sm:flex-row'>
+        <div className='flex-1'>
+          <div className='w-full aspect-[3/4] bg-gray-200 rounded-2xl mb-4' />
+          <div className='flex gap-2'>
+            {[1,2,3].map(n => <div key={n} className='w-16 h-20 bg-gray-200 rounded-lg' />)}
+          </div>
+        </div>
+        <div className='flex-1 space-y-4'>
+          <div className='h-8 bg-gray-200 rounded-lg w-3/4' />
+          <div className='h-4 bg-gray-200 rounded w-1/4' />
+          <div className='h-6 bg-gray-200 rounded w-1/3' />
+          <div className='h-4 bg-gray-200 rounded w-full' />
+          <div className='h-4 bg-gray-200 rounded w-5/6' />
+          <div className='h-12 bg-gray-200 rounded-xl mt-4' />
+          <div className='h-12 bg-gray-200 rounded-xl' />
+        </div>
+      </div>
+    </div>
+  ) : (
+    // Product not found
+    <div className='border-t-2 pt-10 pb-16 text-center'>
+      <div className='py-20 space-y-4'>
+        <p className='text-6xl'>😕</p>
+        <h2 className='text-xl font-bold text-gray-800'>Product Not Found</h2>
+        <p className='text-sm text-gray-500'>This product may no longer be available.</p>
+        <button
+          onClick={() => navigate('/collection')}
+          className='mt-4 px-6 py-2.5 bg-black text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors'
+        >
+          Browse Collection
+        </button>
+      </div>
+    </div>
+  )
 }
 
 export default Product

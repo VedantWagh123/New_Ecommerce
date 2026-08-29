@@ -126,10 +126,10 @@ const Collection = () => {
   }, [sortType]);
 
   return (
-    <div className='flex flex-col sm:flex-row gap-1 sm:gap-10 pt-10 border-t min-h-[60vh]'>
+    <div className='flex flex-col sm:flex-row gap-1 sm:gap-6 pt-10 border-t min-h-[60vh]'>
       
       {/* Filter Options Sidebar */}
-      <div className='w-full sm:min-w-60 sm:sticky sm:top-24 self-start'>
+      <div className='w-full sm:w-44 sm:min-w-[11rem] sm:max-w-[11rem] sm:sticky sm:top-24 self-start shrink-0'>
         <p onClick={() => setShowFilter(!showFilter)} className='my-2 text-xl flex items-center cursor-pointer gap-2 font-medium'>
           FILTERS
           <img className={`h-3 sm:hidden ${showFilter ? 'rotate-90' : ''}`} src={assets.dropdown_icon} alt="" />

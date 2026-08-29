@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { ShopContext } from '../context/ShopContext';
 import Title from '../components/Title';
 import axios from 'axios';
@@ -10,8 +10,9 @@ const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const selectedOrderIdRef = useRef(null);
 
-  const loadOrderData = async () => {
+  const loadOrderData = async (keepSelectedOrderId) => {
     try {
       if (!token) {
         setLoading(false);
@@ -20,7 +21,14 @@ const Orders = () => {
 
       const response = await axios.post(backendUrl + '/api/order/userorders', {}, { headers: { Authorization: `Bearer ${token}` } });
       if (response.data.success) {
-        setOrders(response.data.orders.reverse());
+        const freshOrders = response.data.orders.reverse();
+        setOrders(freshOrders);
+        // Use ref so we always have the latest selectedOrder ID
+        const idToUpdate = keepSelectedOrderId ?? selectedOrderIdRef.current;
+        if (idToUpdate) {
+          const updated = freshOrders.find(o => o._id === idToUpdate);
+          if (updated) setSelectedOrder(updated);
+        }
       }
     } catch (error) {
       console.error(error);
@@ -29,9 +37,59 @@ const Orders = () => {
     }
   };
 
+  // Keep ref always in sync with selectedOrder
+  useEffect(() => {
+    selectedOrderIdRef.current = selectedOrder?._id ?? null;
+  }, [selectedOrder]);
+
   useEffect(() => {
     loadOrderData();
   }, [token]);
+
+  // ── Auto-polling: refresh silently in background ──────────────────────────
+  // • Every 8s when the order detail modal is open (user is watching status)
+  // • Every 15s when just the list is showing
+  // • Pauses automatically when the browser tab is hidden (Page Visibility API)
+  useEffect(() => {
+    if (!token) return;
+
+    const MODAL_INTERVAL = 8000;   // 8 seconds
+    const LIST_INTERVAL  = 15000;  // 15 seconds
+
+    let intervalId = null;
+
+    const startPolling = () => {
+      if (intervalId) clearInterval(intervalId);
+      const delay = selectedOrderIdRef.current ? MODAL_INTERVAL : LIST_INTERVAL;
+      intervalId = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          loadOrderData(); // silently refreshes; ref drives selectedOrder update
+        }
+      }, delay);
+    };
+
+    startPolling();
+
+    // When tab becomes visible again, restart immediately
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadOrderData();
+        startPolling();
+      } else {
+        clearInterval(intervalId);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, Boolean(selectedOrder)]);
+  // ─────────────────────────────────────────────────────────────────────────
+
 
   return (
     <div className='border-t pt-10 pb-20 min-h-[75vh]'>
