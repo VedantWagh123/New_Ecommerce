@@ -467,7 +467,7 @@ const Product = () => {
 
           {/* Action CTAs */}
           {currentVariantStock.status === 'OUT_OF_STOCK' ? (
-            <div className='flex gap-3'>
+            <div className='flex flex-col sm:flex-row gap-3'>
               <button
                 onClick={() => setIsNotifyOpen(true)}
                 className='flex-1 bg-amber-500 hover:bg-amber-600 text-white py-4 rounded-xl text-xs font-bold transition-all uppercase shadow-md flex items-center justify-center gap-2 active:scale-98'
@@ -476,7 +476,7 @@ const Product = () => {
               </button>
             </div>
           ) : (
-            <div className='flex gap-3 items-center'>
+            <div className='flex flex-col sm:flex-row gap-3 items-stretch'>
               <button
                 onClick={() => {
                   if (!size) {

@@ -12,13 +12,11 @@ a.active hr{
     font-family: Outfit;
 }
 
-html {
-    /* Increase base font size to scale up all text globally like Flipkart */
-    font-size: 120%; 
-}
-
-body {
-    overflow-x: hidden;
+@media (min-width: 1024px) {
+    html {
+        /* Increase base font size to scale up all text globally like Flipkart, desktop only */
+        font-size: 120%; 
+    }
 }
 
 .prata-regular {

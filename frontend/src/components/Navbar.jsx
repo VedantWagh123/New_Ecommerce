@@ -217,8 +217,8 @@ const Navbar = () => {
       </div>
 
         {/* Sidebar menu for small screens */}
-        <div className={`fixed top-0 right-0 bottom-0 overflow-hidden bg-white transition-all z-[100] ${visible ? 'w-full' : 'w-0'}`}>
-                <div className='flex flex-col text-gray-600'>
+        <div className={`fixed top-0 right-0 bottom-0 overflow-y-auto overflow-x-hidden bg-white transition-all z-[100] ${visible ? 'w-full' : 'w-0'}`}>
+                <div className='flex flex-col text-gray-600 min-w-full'>
                     <div onClick={()=>setVisible(false)} className='flex items-center gap-4 p-3 cursor-pointer'>
                         <img className='h-4 rotate-180' src={assets.dropdown_icon} alt="" />
                         <p>Back</p>

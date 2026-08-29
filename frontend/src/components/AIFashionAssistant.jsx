@@ -324,7 +324,7 @@ const AIFashionAssistant = () => {
           }
           className={`fixed ${
             position ? '' : 'inset-x-2 bottom-2 top-14 sm:top-auto sm:bottom-20 sm:right-6 sm:left-auto'
-          } w-auto max-w-[calc(100vw-16px)] sm:w-[440px] h-auto sm:h-[630px] max-h-[88vh] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden z-50 animate-ai-slide-up resize min-w-[300px] min-h-[400px] ${
+          } w-auto max-w-[calc(100vw-16px)] sm:w-[440px] h-auto sm:h-[630px] max-h-[88vh] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden z-50 animate-ai-slide-up sm:resize sm:min-w-[300px] min-h-[400px] ${
             isDragging ? 'shadow-inner opacity-95 scale-[0.99] transition-none' : ''
           }`}
         >
