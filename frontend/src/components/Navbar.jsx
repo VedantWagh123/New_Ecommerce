@@ -181,7 +181,8 @@ const Navbar = () => {
                                 onClick={() => { 
                                     setIsProfileOpen(false); 
                                     if (sellerStatus === 'approved' || sellerStatus === 'pending') {
-                                        window.open(`http://localhost:5175/?sso_token=${token}`, '_blank');
+                                        const sellerUrl = import.meta.env.VITE_SELLER_URL || 'http://localhost:5175';
+                                        window.open(`${sellerUrl}/?sso_token=${token}`, '_blank');
                                     } else {
                                         navigate('/profile');
                                     }
@@ -239,7 +240,8 @@ const Navbar = () => {
                                 <button onClick={() => { 
                                     setVisible(false); 
                                     if (sellerStatus === 'approved' || sellerStatus === 'pending') {
-                                        window.open(`http://localhost:5175/?sso_token=${token}`, '_blank');
+                                        const sellerUrl = import.meta.env.VITE_SELLER_URL || 'http://localhost:5175';
+                                        window.open(`${sellerUrl}/?sso_token=${token}`, '_blank');
                                     } else {
                                         navigate('/profile');
                                     }
