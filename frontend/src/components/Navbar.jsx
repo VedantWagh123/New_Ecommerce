@@ -140,7 +140,7 @@ const Navbar = () => {
                 ref={profileRef}
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
-                className='relative'
+                className='relative hidden sm:block'
             >
                 <img 
                     onClick={handleProfileClick} 
@@ -236,6 +236,24 @@ const Navbar = () => {
                                 <NavLink onClick={()=>setVisible(false)} className='py-2 pl-6 border-b block font-semibold text-gray-800' to='/profile'>My Profile</NavLink>
                                 <NavLink onClick={()=>setVisible(false)} className='py-2 pl-6 border-b block font-semibold text-gray-800' to='/orders'>My Orders</NavLink>
                                 <NavLink onClick={()=>setVisible(false)} className='py-2 pl-6 border-b block font-semibold text-gray-800' to='/wishlist'>Wishlist ({wishlist?.length || 0})</NavLink>
+                                <button onClick={() => { 
+                                    setVisible(false); 
+                                    if (sellerStatus === 'approved' || sellerStatus === 'pending') {
+                                        window.open(`http://localhost:5175/?sso_token=${token}`, '_blank');
+                                    } else {
+                                        navigate('/profile');
+                                    }
+                                }} className='w-full text-left py-2 pl-6 border-b font-semibold text-gray-800 block flex items-center gap-2'>
+                                    {sellerStatus === 'approved' ? (
+                                        <><span>🏪</span> <span>Seller Dashboard</span></>
+                                    ) : sellerStatus === 'pending' ? (
+                                        <><span>⏳</span> <span>Application Pending</span></>
+                                    ) : sellerStatus === 'rejected' ? (
+                                        <><span>❌</span> <span>Apply Again (Seller)</span></>
+                                    ) : (
+                                        <><span>🛍️</span> <span>Become a Seller</span></>
+                                    )}
+                                </button>
                                 <button onClick={() => { setVisible(false); logout(); }} className='w-full text-left py-2 pl-6 border-b font-semibold text-rose-600 block'>Logout</button>
                             </>
                         ) : (
