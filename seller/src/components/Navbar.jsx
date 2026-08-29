@@ -1,5 +1,6 @@
 import React from 'react';
-import { Search, Bell, Calendar, Store, CheckCircle2 } from 'lucide-react';
+import { Search, Calendar, Store, CheckCircle2 } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 const Navbar = ({ storeInfo, searchQuery, setSearchQuery }) => {
   const currentDate = new Date().toLocaleDateString('en-US', {
@@ -31,10 +32,7 @@ const Navbar = ({ storeInfo, searchQuery, setSearchQuery }) => {
         </div>
 
         {/* Notifications Icon */}
-        <button className="relative p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">
-          <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-500 rounded-full ring-2 ring-white"></span>
-        </button>
+        <NotificationBell />
 
         <div className="h-6 w-px bg-slate-200"></div>
 

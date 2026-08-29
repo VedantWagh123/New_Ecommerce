@@ -7,6 +7,7 @@ import productModel from "../models/productModel.js";
 import orderModel from "../models/orderModel.js";
 import reviewModel from "../models/reviewModel.js";
 import payoutModel from "../models/payoutModel.js";
+import { sendNotification } from "../config/socket.js";
 
 const createToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET);
@@ -568,7 +569,7 @@ const updateSellerOrderStatus = async (req, res) => {
             return res.json({ success: false, message: "Cannot update status while a cancellation request is pending." });
         }
 
-        const validSellerStatuses = ['Packing', 'Accepted', 'Packed', 'Ready to Ship', 'Handed to Logistics'];
+        const validSellerStatuses = ['Packing', 'Accepted', 'Packed', 'Ready for Pickup'];
         const currentStatusIdx = validSellerStatuses.indexOf(order.status);
         const nextStatusIdx = validSellerStatuses.indexOf(status);
 
@@ -603,6 +604,10 @@ const updateSellerOrderStatus = async (req, res) => {
         order.updatedAt = now;
 
         await order.save();
+
+        if (status === 'Ready for Pickup') {
+            await sendNotification('admin', null, 'Order Ready for Pickup', `Order #${order._id.toString().slice(-8).toUpperCase()} is ready for pickup by seller ${sellerStore}.`, order._id);
+        }
 
         res.json({ success: true, message: `Order status updated to ${status}` });
 

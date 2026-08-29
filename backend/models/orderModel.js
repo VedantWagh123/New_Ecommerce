@@ -19,7 +19,17 @@ const orderSchema = new mongoose.Schema({
     date: { type: Number, required: true },
     updatedAt: { type: Number, default: Date.now },
     cancelStatus: { type: String, default: 'None', enum: ['None', 'Requested', 'Approved', 'Rejected'] },
-    cancelReason: { type: String, default: '' }
+    cancelReason: { type: String, default: '' },
+    deliveryPartnerId: { type: String, default: null },
+    pickupOTP: { type: String, default: '' },
+    deliveryOTP: { type: String, default: '' },
+    codReceipt: {
+        status: { type: String, default: 'Pending' },
+        amount: { type: Number, default: 0 },
+        collectedAt: { type: Number, default: null },
+        method: { type: String, default: '' },
+        referenceId: { type: String, default: '' }
+    }
 })
 
 const orderModel = mongoose.models.order || mongoose.model('order', orderSchema)

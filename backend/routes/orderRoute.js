@@ -1,5 +1,5 @@
 import express from 'express'
-import {placeOrder, placeOrderStripe, placeOrderRazorpay, allOrders, userOrders, updateStatus, deleteOrder, verifyStripe, verifyRazorpay, getAdminAnalytics, requestCancellation, approveCancellation, rejectCancellation} from '../controllers/orderController.js'
+import {placeOrder, placeOrderStripe, placeOrderRazorpay, allOrders, userOrders, updateStatus, deleteOrder, verifyStripe, verifyRazorpay, getAdminAnalytics, requestCancellation, approveCancellation, rejectCancellation, assignWishmaster} from '../controllers/orderController.js'
 import adminAuth  from '../middleware/adminAuth.js'
 import roleAuth from '../middleware/roleAuth.js'
 import authUser from '../middleware/auth.js'
@@ -11,6 +11,7 @@ orderRouter.post('/list',adminAuth,roleAuth(['super_admin', 'support']),allOrder
 orderRouter.post('/status',adminAuth,roleAuth(['super_admin', 'support']),updateStatus)
 orderRouter.post('/delete',adminAuth,roleAuth(['super_admin']),deleteOrder)
 orderRouter.get('/admin-analytics', adminAuth, roleAuth(['super_admin']), getAdminAnalytics)
+orderRouter.post('/assign-wishmaster', adminAuth, roleAuth(['super_admin', 'support']), assignWishmaster)
 
 // Payment Features
 orderRouter.post('/place',authUser,placeOrder)

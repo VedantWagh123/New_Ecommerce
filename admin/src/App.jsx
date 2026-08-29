@@ -8,6 +8,7 @@ import List from './pages/List'
 import Orders from './pages/Orders'
 import Reviews from './pages/Reviews'
 import Sellers from './pages/Sellers'
+import DeliveryPartners from './pages/DeliveryPartners'
 import ProductApprovals from './pages/ProductApprovals'
 import TrendingManagement from './pages/TrendingManagement'
 import BankOffers from './pages/BankOffers'
@@ -22,6 +23,7 @@ import AddVideo from './pages/AddVideo'
 import ManageVideos from './pages/ManageVideos'
 import GlobalSettings from './pages/Settings'
 import Login from './components/Login'
+import { SocketProvider } from './context/SocketContext'
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -43,7 +45,7 @@ const App = () => {
       <ToastContainer position="top-right" autoClose={3000} />
       {token === ""
         ? <Login setToken={setToken} setRole={setRole} />
-        : <>
+        : <SocketProvider token={token} role={role}>
           {/* Navbar remains at the top, non-scrolling */}
           <div className="shrink-0">
             <Navbar setToken={setToken} setRole={setRole} role={role} />
@@ -69,6 +71,7 @@ const App = () => {
                   <Route path='/orders' element={<Orders token={token} />} />
                   <Route path='/reviews' element={<Reviews token={token} />} />
                   <Route path='/sellers' element={<Sellers token={token} />} />
+                  <Route path='/delivery-partners' element={<DeliveryPartners token={token} />} />
                   <Route path='/product-approvals' element={<ProductApprovals token={token} />} />
                   <Route path='/sub-admins' element={<SubAdmins token={token} />} />
                   <Route path='/coupons' element={<Coupons token={token} />} />
@@ -82,7 +85,7 @@ const App = () => {
               </div>
             </main>
           </div>
-        </>
+        </SocketProvider>
       }
     </div>
   )

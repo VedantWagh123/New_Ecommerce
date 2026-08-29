@@ -258,25 +258,50 @@ const OrderDetailsModal = ({ isOpen, onClose, order, currency = '$', onRefresh }
                                 <div className="space-y-3 text-sm">
                                     <div className="flex justify-between">
                                         <span className="text-gray-500">Subtotal</span>
-                                        <span className="font-semibold">{currency}{(amount - (order.tax || 0) - (order.platformFee || 0)).toFixed(2)}</span>
+                                        <span className="font-semibold">{currency}{(order.subtotal || items.reduce((sum, item) => sum + (item.price * item.quantity), 0)).toFixed(2)}</span>
                                     </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Shipping & Platform</span>
-                                        <span className="font-semibold">{currency}{(order.platformFee || 0).toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Estimated Tax</span>
-                                        <span className="font-semibold">{currency}{(order.tax || 0).toFixed(2)}</span>
-                                    </div>
+                                    {order.couponDiscount > 0 && (
+                                        <div className="flex justify-between text-emerald-600">
+                                            <span className="font-medium">Discount {order.couponCode ? `(${order.couponCode})` : ''}</span>
+                                            <span className="font-bold">-{currency}{order.couponDiscount.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    {order.deliveryFee > 0 && (
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Delivery Fee</span>
+                                            <span className="font-semibold">{currency}{order.deliveryFee.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    {(order.platformFee || 0) > 0 && (
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Platform Fee</span>
+                                            <span className="font-semibold">{currency}{(order.platformFee || 0).toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    {(order.tax || 0) > 0 && (
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Estimated Tax</span>
+                                            <span className="font-semibold">{currency}{(order.tax || 0).toFixed(2)}</span>
+                                        </div>
+                                    )}
                                     <div className="pt-3 border-t border-gray-200 flex justify-between font-bold text-gray-900 text-base">
                                         <span>Total</span>
                                         <span>{currency}{amount.toFixed(2)}</span>
                                     </div>
-                                    <div className="pt-2 flex justify-between items-center">
-                                        <span className="text-gray-500 text-xs">Payment Method: <span className="font-bold text-gray-900">{paymentMethod}</span></span>
-                                        <span className={`text-xs font-bold px-2 py-1 rounded ${payment ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                                            {payment ? 'Paid' : 'Pending'}
-                                        </span>
+                                    <div className="pt-2 flex justify-between items-start">
+                                        <span className="text-gray-500 text-xs mt-1">Payment Method: <span className="font-bold text-gray-900">{paymentMethod === 'COD' ? 'Cash on Delivery' : paymentMethod}</span></span>
+                                        {paymentMethod === 'COD' ? (
+                                            <div className="flex flex-col items-end gap-1.5">
+                                                <span className="text-xs font-bold text-gray-900">COD Amount: {currency}{amount.toFixed(2)}</span>
+                                                <span className={`text-[10px] font-bold px-2 py-1 rounded ${payment ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                    Payment Status: {payment ? 'Collected' : 'Pending'}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className={`text-xs font-bold px-2 py-1 rounded mt-0.5 ${payment ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                {payment ? 'Paid' : 'Pending'}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             </div>

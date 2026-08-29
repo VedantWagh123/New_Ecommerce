@@ -1,7 +1,9 @@
 import mongoose from 'mongoose';
 
 const payoutSchema = new mongoose.Schema({
-    sellerId: { type: String, required: true, index: true },
+    sellerId: { type: String, required: false, index: true },
+    deliveryPartnerId: { type: String, required: false, index: true },
+    userType: { type: String, enum: ['seller', 'delivery'], default: 'seller' },
     amount: { type: Number, required: true },
     status: { type: String, enum: ['pending', 'completed', 'rejected'], default: 'pending' },
     paymentMethod: { type: String, default: 'Bank Transfer' },

@@ -2,6 +2,7 @@ import { createContext, useEffect, useState, useRef } from "react";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import axios from 'axios'
+import { io } from 'socket.io-client';
 
 export const ShopContext = createContext();
 
@@ -14,6 +15,7 @@ const ShopContextProvider = (props) => {
     const [showSearch, setShowSearch] = useState(false);
     const [cartItems, setCartItems] = useState({});
     const [karmaScore, setKarmaScore] = useState(100);
+    const [hasUsedBundle, setHasUsedBundle] = useState(false);
     const [products, setProducts] = useState([]);
     const [token, setToken] = useState('')
     const [couponData, setCouponData] = useState({ code: '', discount: 0 });
@@ -22,6 +24,53 @@ const ShopContextProvider = (props) => {
     const [nluSearchResult, setNluSearchResult] = useState(null);
     const [isNluSearching, setIsNluSearching] = useState(false);
     const nluAbortControllerRef = useRef(null);
+
+    const [socket, setSocket] = useState(null);
+    const [notifications, setNotifications] = useState([]);
+
+    useEffect(() => {
+        if (token) {
+            const newSocket = io(backendUrl, {
+                auth: { token, role: 'user' }
+            });
+            setSocket(newSocket);
+
+            newSocket.on('new-notification', (notification) => {
+                setNotifications(prev => [notification, ...prev]);
+                toast.info(`🔔 ${notification.title}: ${notification.message}`);
+            });
+
+            axios.get(backendUrl + '/api/notification', { headers: { 'x-role': 'user', Authorization: `Bearer ${token}` } })
+                .then(res => {
+                    if (res.data.success) {
+                        setNotifications(res.data.notifications);
+                    }
+                })
+                .catch(console.error);
+
+            return () => newSocket.disconnect();
+        } else {
+            if (socket) {
+                socket.disconnect();
+                setSocket(null);
+            }
+            setNotifications([]);
+        }
+    }, [token, backendUrl]);
+
+    const markAsRead = async (ids) => {
+        try {
+            await axios.post(backendUrl + '/api/notification/read', { notificationIds: ids }, { headers: { 'x-role': 'user', Authorization: `Bearer ${token}` } });
+            setNotifications(prev => prev.map(n => ids.includes(n._id) ? { ...n, isRead: true } : n));
+        } catch (e) {}
+    };
+
+    const markAllAsRead = async () => {
+        try {
+            await axios.post(backendUrl + '/api/notification/read-all', {}, { headers: { 'x-role': 'user', Authorization: `Bearer ${token}` } });
+            setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        } catch (e) {}
+    };
 
     const fetchNluSearch = async (query) => {
         if (!query.trim()) {
@@ -106,11 +155,14 @@ const ShopContextProvider = (props) => {
             try {
 
                 await axios.post(backendUrl + '/api/cart/add', { itemId, size }, { headers: { Authorization: `Bearer ${token}` } })
+                toast.success('Product added to cart!');
 
             } catch (error) {
                 console.log(error)
                 toast.error(error.message)
             }
+        } else {
+            toast.success('Product added to cart!');
         }
 
         // Analytics Tracking for ADD_TO_CART
@@ -366,6 +418,12 @@ const ShopContextProvider = (props) => {
                 if (response.data.karmaScore !== undefined) {
                     setKarmaScore(response.data.karmaScore)
                 }
+                if (response.data.hasUsedBundle !== undefined) {
+                    setHasUsedBundle(response.data.hasUsedBundle)
+                    if (response.data.hasUsedBundle) {
+                        localStorage.setItem('bundleUsed', 'true')
+                    }
+                }
             }
         } catch (error) {
             console.log(error)
@@ -376,6 +434,13 @@ const ShopContextProvider = (props) => {
     useEffect(() => {
         getProductsData()
     }, [])
+
+    useEffect(() => {
+        if (socket) {
+            socket.on('product-updated', getProductsData);
+            return () => socket.off('product-updated', getProductsData);
+        }
+    }, [socket]);
 
     const [sellerStatus, setSellerStatus] = useState('none');
 
@@ -557,7 +622,9 @@ const ShopContextProvider = (props) => {
         vipStatus, vipSubscription, fetchVipStatus,
         couponData, setCouponData, applyCouponCode,
         karmaScore, setKarmaScore,
-        nluSearchResult, setNluSearchResult, isNluSearching, fetchNluSearch
+        nluSearchResult, setNluSearchResult, isNluSearching, fetchNluSearch,
+        socket, notifications, markAsRead, markAllAsRead,
+        hasUsedBundle, setHasUsedBundle
     }
 
     return (

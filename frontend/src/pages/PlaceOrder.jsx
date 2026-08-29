@@ -23,7 +23,8 @@ const PlaceOrder = () => {
         currency,
         getCartCount,
         karmaScore,
-        getCartTotals
+        getCartTotals,
+        setCouponData
     } = useContext(ShopContext);
 
     const { subtotal, finalTotal, deliveryFee, couponCode, couponDiscountAmount, tax, platformFee } = getCartTotals();
@@ -128,8 +129,12 @@ const PlaceOrder = () => {
             address: formData
         };
 
+        if (couponCode === 'BUNDLE20') {
+            localStorage.setItem('bundleUsed', 'true');
+        }
         setCompletedOrderDetails(orderSummary);
         setCartItems({});
+        setCouponData({ code: '', discount: 0 }); // Clear the coupon data so it doesn't persist to the next order
         setShowSuccessModal(true);
     };
 

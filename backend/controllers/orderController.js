@@ -5,6 +5,7 @@ import Stripe from 'stripe'
 import razorpay from 'razorpay'
 import settingsModel from "../models/settingsModel.js";
 import couponModel from "../models/couponModel.js";
+import { sendNotification, getIO } from "../config/socket.js";
 
 // Helper to attach sellerId and storeName to order items from Product & User collections
 const enrichItemsWithSellerId = async (items) => {
@@ -42,13 +43,26 @@ const enrichItemsWithSellerId = async (items) => {
 const currency = 'inr'
 const deliveryCharge = 10
 
-const markCouponAsUsed = async (couponCode) => {
+const markCouponAsUsed = async (couponCode, userId) => {
     if (!couponCode) return;
     try {
         const coupon = await couponModel.findOne({ code: couponCode.toUpperCase() });
-        if (coupon && coupon.isOneTime && !coupon.isUsed) {
-            coupon.isUsed = true;
-            await coupon.save();
+        if (coupon) {
+            let modified = false;
+            if (coupon.isOneTime && !coupon.isUsed) {
+                coupon.isUsed = true;
+                modified = true;
+            }
+            if (userId) {
+                if (!coupon.usedBy) coupon.usedBy = [];
+                if (!coupon.usedBy.includes(userId)) {
+                    coupon.usedBy.push(userId);
+                    modified = true;
+                }
+            }
+            if (modified) {
+                await coupon.save();
+            }
         }
     } catch(err) {
         console.error("Error marking coupon as used:", err);
@@ -85,6 +99,27 @@ const placeOrder = async (req,res) => {
             return res.json({ success: false, message: "COD is disabled for your account due to low Karma Score (high return rate). Please use prepaid methods." });
         }
 
+        // Validate Coupon Before Placing Order
+        if (couponCode) {
+            if (couponCode === 'BUNDLE20') {
+                const pastOrder = await orderModel.findOne({ userId, couponCode: 'BUNDLE20' });
+                if (pastOrder) {
+                    return res.json({ success: false, message: "Bundle discount is only valid for your first bundle purchase." });
+                }
+            } else {
+                const coupon = await couponModel.findOne({ code: couponCode.toUpperCase() });
+                if (!coupon) {
+                    return res.json({ success: false, message: "Invalid coupon code." });
+                }
+                if (coupon.isOneTime && coupon.isUsed) {
+                    return res.json({ success: false, message: "This coupon has already been used and is only valid for one order." });
+                }
+                if (coupon.usedBy && coupon.usedBy.includes(userId)) {
+                    return res.json({ success: false, message: "You have already used this coupon on a previous order." });
+                }
+            }
+        }
+
         const enrichedItems = await enrichItemsWithSellerId(items);
         const now = Date.now();
 
@@ -118,9 +153,11 @@ const placeOrder = async (req,res) => {
 
         const newOrder = new orderModel(orderData)
         await newOrder.save()
-        await markCouponAsUsed(couponCode);
+        await markCouponAsUsed(couponCode, userId);
 
         await userModel.findByIdAndUpdate(userId,{cartData:{}})
+        
+        getIO().emit('order-updated');
 
         res.json({success:true,message:"Order Placed", orderId: newOrder._id})
 
@@ -137,6 +174,28 @@ const placeOrderStripe = async (req,res) => {
     try {
         
         const { userId, items, amount, address, couponCode, couponDiscount, tax, platformFee, subtotal, deliveryFee} = req.body
+        
+        // Validate Coupon Before Placing Order
+        if (couponCode) {
+            if (couponCode === 'BUNDLE20') {
+                const pastOrder = await orderModel.findOne({ userId, couponCode: 'BUNDLE20' });
+                if (pastOrder) {
+                    return res.json({ success: false, message: "Bundle discount is only valid for your first bundle purchase." });
+                }
+            } else {
+                const coupon = await couponModel.findOne({ code: couponCode.toUpperCase() });
+                if (!coupon) {
+                    return res.json({ success: false, message: "Invalid coupon code." });
+                }
+                if (coupon.isOneTime && coupon.isUsed) {
+                    return res.json({ success: false, message: "This coupon has already been used and is only valid for one order." });
+                }
+                if (coupon.usedBy && coupon.usedBy.includes(userId)) {
+                    return res.json({ success: false, message: "You have already used this coupon on a previous order." });
+                }
+            }
+        }
+
         const enrichedItems = await enrichItemsWithSellerId(items);
         const { origin } = req.headers;
         const now = Date.now();
@@ -171,7 +230,7 @@ const placeOrderStripe = async (req,res) => {
 
         const newOrder = new orderModel(orderData)
         await newOrder.save()
-        await markCouponAsUsed(couponCode);
+        await markCouponAsUsed(couponCode, userId);
 
         const line_items = items.map((item) => ({
             price_data: {
@@ -220,6 +279,9 @@ const verifyStripe = async (req,res) => {
         if (success === "true") {
             await orderModel.findByIdAndUpdate(orderId, {payment:true});
             await userModel.findByIdAndUpdate(userId, {cartData: {}})
+            
+            getIO().emit('order-updated');
+            
             res.json({success: true});
         } else {
             await orderModel.findByIdAndDelete(orderId)
@@ -238,6 +300,28 @@ const placeOrderRazorpay = async (req,res) => {
     try {
         
         const { userId, items, amount, address, couponCode, couponDiscount, tax, platformFee, subtotal, deliveryFee} = req.body
+        
+        // Validate Coupon Before Placing Order
+        if (couponCode) {
+            if (couponCode === 'BUNDLE20') {
+                const pastOrder = await orderModel.findOne({ userId, couponCode: 'BUNDLE20' });
+                if (pastOrder) {
+                    return res.json({ success: false, message: "Bundle discount is only valid for your first bundle purchase." });
+                }
+            } else {
+                const coupon = await couponModel.findOne({ code: couponCode.toUpperCase() });
+                if (!coupon) {
+                    return res.json({ success: false, message: "Invalid coupon code." });
+                }
+                if (coupon.isOneTime && coupon.isUsed) {
+                    return res.json({ success: false, message: "This coupon has already been used and is only valid for one order." });
+                }
+                if (coupon.usedBy && coupon.usedBy.includes(userId)) {
+                    return res.json({ success: false, message: "You have already used this coupon on a previous order." });
+                }
+            }
+        }
+
         const enrichedItems = await enrichItemsWithSellerId(items);
         const now = Date.now();
 
@@ -333,6 +417,9 @@ const verifyRazorpay = async (req,res) => {
         if (orderInfo.status === 'paid') {
             await orderModel.findByIdAndUpdate(orderInfo.receipt,{payment:true});
             await userModel.findByIdAndUpdate(userId,{cartData:{}})
+            
+            getIO().emit('order-updated');
+            
             res.json({ success: true, message: "Payment Successful" })
         } else {
              res.json({ success: false, message: 'Payment Failed' });
@@ -451,6 +538,8 @@ const updateStatus = async (req,res) => {
                 }
             }
         }
+        
+        getIO().emit('order-updated');
 
         res.json({success:true, message:'Status Updated', orderId, status})
 
@@ -722,6 +811,8 @@ const approveCancellation = async (req, res) => {
                 await userModel.findByIdAndUpdate(order.userId, { karmaScore: Math.max(0, user.karmaScore - 20) });
             }
         }
+        
+        getIO().emit('order-updated');
 
         res.json({ success: true, message: 'Cancellation approved.' });
     } catch (error) {
@@ -747,4 +838,50 @@ const rejectCancellation = async (req, res) => {
     }
 };
 
-export {verifyRazorpay, verifyStripe ,placeOrder, placeOrderStripe, placeOrderRazorpay, allOrders, userOrders, updateStatus, deleteOrder, getAdminAnalytics, requestCancellation, approveCancellation, rejectCancellation}
+const assignWishmaster = async (req, res) => {
+    try {
+        const { orderId, partnerId } = req.body;
+        
+        const order = await orderModel.findById(orderId);
+        if (!order) {
+            return res.json({ success: false, message: 'Order not found' });
+        }
+
+        if (order.status !== 'Ready for Pickup' && order.status !== 'Assigned') {
+            return res.json({ success: false, message: `Cannot assign Wishmaster. Order status is ${order.status}` });
+        }
+
+        const partner = await userModel.findOne({ _id: partnerId, isDeliveryPartner: true });
+        if (!partner) {
+            return res.json({ success: false, message: 'Valid and approved Delivery Partner not found' });
+        }
+
+        const now = Date.now();
+        const history = order.statusHistory || [];
+        history.push({
+            status: 'Assigned',
+            timestamp: now,
+            updatedBy: 'Admin',
+            note: `Order assigned to Wishmaster: ${partner.name}`
+        });
+
+        order.status = 'Assigned';
+        order.deliveryPartnerId = partnerId;
+        order.statusHistory = history;
+        order.updatedAt = now;
+
+        await order.save();
+
+        // Notification to Delivery Partner
+        await sendNotification('delivery', partnerId, 'New Delivery Assigned', `You have been assigned to deliver Order #${order._id.toString().slice(-8).toUpperCase()}`, order._id);
+        
+        getIO().emit('order-updated');
+
+        res.json({ success: true, message: 'Wishmaster assigned successfully', order });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+};
+
+export {verifyRazorpay, verifyStripe ,placeOrder, placeOrderStripe, placeOrderRazorpay, allOrders, userOrders, updateStatus, deleteOrder, getAdminAnalytics, requestCancellation, approveCancellation, rejectCancellation, assignWishmaster}

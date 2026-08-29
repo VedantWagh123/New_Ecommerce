@@ -2,6 +2,7 @@ import { v2 as cloudinary } from "cloudinary"
 import productModel from "../models/productModel.js"
 import productEventModel from "../models/productEventModel.js"
 import userModel from "../models/userModel.js"
+import { getIO } from "../config/socket.js"
 
 // Helper to populate storeName on products
 const enrichProductsWithStoreName = async (products) => {
@@ -82,6 +83,8 @@ const addProduct = async (req, res) => {
                 }).catch(err => console.warn('Vector indexing failed for admin product', product._id, ':', err.message));
             }).catch(() => {});
         }
+        
+        getIO().emit('product-updated');
 
         res.json({ success: true, message: "Product Added" })
 
@@ -115,6 +118,9 @@ const removeProduct = async (req, res) => {
     try {
         
         await productModel.findByIdAndDelete(req.body.id)
+        
+        getIO().emit('product-updated');
+        
         res.json({success:true,message:"Product Removed"})
 
     } catch (error) {
@@ -171,6 +177,9 @@ const approveProduct = async (req, res) => {
         if (!product) {
             return res.json({ success: false, message: "Product not found" });
         }
+        
+        getIO().emit('product-updated');
+        
         res.json({ success: true, message: `Product "${product.name}" approved!`, product });
     } catch (error) {
         console.log(error);
@@ -190,6 +199,9 @@ const rejectProduct = async (req, res) => {
         if (!product) {
             return res.json({ success: false, message: "Product not found" });
         }
+        
+        getIO().emit('product-updated');
+        
         res.json({ success: true, message: `Product "${product.name}" rejected.`, product });
     } catch (error) {
         console.log(error);

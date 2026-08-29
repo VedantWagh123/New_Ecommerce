@@ -4,15 +4,17 @@ import Title from '../components/Title';
 import axios from 'axios';
 import OrderDetailsModal from '../components/OrderDetailsModal';
 import { getStatusBadgeStyle } from '../utils/orderStatus';
+import { useLocation } from 'react-router-dom';
 
 const Orders = () => {
-  const { backendUrl, token, currency, navigate } = useContext(ShopContext);
+  const { backendUrl, token, currency, navigate, socket } = useContext(ShopContext);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const selectedOrderIdRef = useRef(null);
+  const location = useLocation();
 
-  const loadOrderData = async (keepSelectedOrderId) => {
+  const loadOrderData = useCallback(async (keepSelectedOrderId) => {
     try {
       if (!token) {
         setLoading(false);
@@ -35,7 +37,7 @@ const Orders = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [backendUrl, token]);
 
   // Keep ref always in sync with selectedOrder
   useEffect(() => {
@@ -44,7 +46,35 @@ const Orders = () => {
 
   useEffect(() => {
     loadOrderData();
-  }, [token]);
+  }, [token, loadOrderData]);
+
+  useEffect(() => {
+    if (socket) {
+      const handleNotification = (notif) => {
+        if (notif.orderId) {
+          loadOrderData();
+        }
+      };
+      socket.on('new-notification', handleNotification);
+      socket.on('order-updated', loadOrderData);
+      return () => {
+        socket.off('new-notification', handleNotification);
+        socket.off('order-updated', loadOrderData);
+      };
+    }
+  }, [socket, loadOrderData]);
+
+  // Open specific order from notification click
+  useEffect(() => {
+    if (orders.length > 0 && location.state?.openOrderId) {
+      const targetOrder = orders.find(o => o._id === location.state.openOrderId);
+      if (targetOrder) {
+        setSelectedOrder(targetOrder);
+        // Clear the state so it doesn't reopen on page refresh
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    }
+  }, [orders, location, navigate]);
 
   // ── Auto-polling: refresh silently in background ──────────────────────────
   // • Every 8s when the order detail modal is open (user is watching status)

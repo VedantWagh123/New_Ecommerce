@@ -21,15 +21,23 @@ import storyRouter from './routes/storyRoute.js'
 import discoverRouter from './routes/discoverRoute.js'
 import settingsRouter from './routes/settingsRoute.js'
 import newsletterRouter from './routes/newsletterRoute.js'
+import deliveryRouter from './routes/deliveryRoute.js'
+import notificationRouter from './routes/notificationRoute.js'
+import { createServer } from 'http'
+import { initSocket } from './config/socket.js'
 
 // App Config
 const app = express()
+const server = createServer(app)
 const port = process.env.PORT || 4000
 connectDB()
 connectCloudinary()
 
 // Start Background Services
 startCartRecoveryCron()
+
+// Initialize Socket.io
+initSocket(server);
 
 // middlewares
 app.use(express.json({ limit: '50mb' }))
@@ -54,11 +62,13 @@ app.use('/api/story',storyRouter)
 app.use('/api/discover',discoverRouter)
 app.use('/api/settings',settingsRouter)
 app.use('/api/newsletter',newsletterRouter)
+app.use('/api/delivery',deliveryRouter)
+app.use('/api/notification',notificationRouter)
 
 
 app.get('/',(req,res)=>{
     res.send("API Working")
 })
 
-app.listen(port, ()=> console.log('Server started on PORT : '+ port))
+server.listen(port, ()=> console.log('Server started on PORT : '+ port))
 // Refreshed server instance

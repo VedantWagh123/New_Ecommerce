@@ -3,7 +3,7 @@ import Title from '../components/Title'
 import { ShopContext } from '../context/ShopContext'
 import axios from 'axios'
 import { toast } from 'react-toastify'
-import { Camera, Mail, Phone, MapPin, User, ArrowRight, ShieldCheck, Clock, XCircle, Store } from 'lucide-react'
+import { Camera, Mail, Phone, MapPin, User, ArrowRight, ShieldCheck, Clock, XCircle, Store, Truck } from 'lucide-react'
 
 const Profile = () => {
     const { token, sellerStatus, backendUrl, fetchSellerStatus } = useContext(ShopContext);
@@ -27,6 +27,8 @@ const Profile = () => {
     const [originalAvatar, setOriginalAvatar] = useState('');
     const fileInputRef = useRef(null);
 
+    const [deliveryStatus, setDeliveryStatus] = useState('none');
+
     // Seller Application Modal State
     const [showSellerModal, setShowSellerModal] = useState(false);
     const [sellerForm, setSellerForm] = useState({
@@ -39,6 +41,15 @@ const Profile = () => {
         ifscCode: ''
     });
     const [applyingSeller, setApplyingSeller] = useState(false);
+
+    // Delivery Partner Modal State
+    const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+    const [deliveryForm, setDeliveryForm] = useState({
+        vehicleDetails: '',
+        drivingLicense: '',
+        serviceCity: ''
+    });
+    const [applyingDelivery, setApplyingDelivery] = useState(false);
 
     const fetchUserProfile = async () => {
         if (!token) return;
@@ -65,6 +76,7 @@ const Profile = () => {
                 });
                 setAvatarPreview(user.avatar || '');
                 setOriginalAvatar(user.avatar || '');
+                setDeliveryStatus(user.deliveryStatus || 'none');
             } else {
                 toast.error(response.data.message);
                 // If token is expired or invalid, auto-logout
@@ -173,6 +185,36 @@ const Profile = () => {
             toast.error(error.response?.data?.message || 'Failed to submit application');
         } finally {
             setApplyingSeller(false);
+        }
+    };
+
+    const onDeliveryApply = async (e) => {
+        e.preventDefault();
+        setApplyingDelivery(true);
+        try {
+            const submitPayload = {
+                userId: token ? JSON.parse(atob(token.split('.')[1])).id : null, // Not best practice but backend authUser also sets req.userId
+                vehicleDetails: deliveryForm.vehicleDetails,
+                drivingLicense: deliveryForm.drivingLicense,
+                serviceCity: deliveryForm.serviceCity
+            };
+            const response = await axios.post(
+                backendUrl + '/api/user/apply-delivery-partner', 
+                submitPayload, 
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            if (response.data.success) {
+                toast.success(response.data.message);
+                setShowDeliveryModal(false);
+                fetchUserProfile(); 
+            } else {
+                toast.error(response.data.message);
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error(error.response?.data?.message || 'Failed to submit application');
+        } finally {
+            setApplyingDelivery(false);
         }
     };
 
@@ -317,6 +359,73 @@ const Profile = () => {
                                         className='mt-5 w-full py-3 bg-gray-900 hover:bg-gray-800 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2'
                                     >
                                         BECOME A SELLER <ArrowRight className="w-3.5 h-3.5" />
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Delivery Partner Status Card (Glassmorphism) */}
+                    <div className='bg-white/70 backdrop-blur-xl border border-white rounded-3xl p-6 flex flex-col gap-3 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden'>
+                        <div className='absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 pointer-events-none' />
+                        
+                        <div className='relative z-10'>
+                            {deliveryStatus === 'approved' ? (
+                                <>
+                                    <div className='w-12 h-12 rounded-2xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center mb-4 shadow-inner'>
+                                        <ShieldCheck className="w-6 h-6" />
+                                    </div>
+                                    <h4 className='text-base font-bold text-gray-900'>Verified Wishmaster</h4>
+                                    <p className='text-sm text-gray-500 leading-relaxed mt-1'>
+                                        You are an approved Delivery Partner. Access your portal to accept orders and earn.
+                                    </p>
+                                    <button 
+                                        onClick={() => window.open(`http://localhost:5176/?sso_token=${token}`, '_blank')} 
+                                        className='mt-5 w-full py-3 bg-gray-900 hover:bg-gray-800 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2'
+                                    >
+                                        OPEN DELIVERY PORTAL <ArrowRight className="w-3.5 h-3.5" />
+                                    </button>
+                                </>
+                            ) : deliveryStatus === 'pending' ? (
+                                <>
+                                    <div className='w-12 h-12 rounded-2xl bg-amber-100/80 text-amber-600 flex items-center justify-center mb-4 shadow-inner'>
+                                        <Clock className="w-6 h-6" />
+                                    </div>
+                                    <h4 className='text-base font-bold text-gray-900'>Wishmaster Application Pending</h4>
+                                    <p className='text-sm text-gray-500 leading-relaxed mt-1'>
+                                        Your delivery partner application is under review. Check back shortly!
+                                    </p>
+                                </>
+                            ) : deliveryStatus === 'rejected' ? (
+                                <>
+                                    <div className='w-12 h-12 rounded-2xl bg-rose-100/80 text-rose-600 flex items-center justify-center mb-4 shadow-inner'>
+                                        <XCircle className="w-6 h-6" />
+                                    </div>
+                                    <h4 className='text-base font-bold text-gray-900'>Wishmaster Application Rejected</h4>
+                                    <p className='text-sm text-gray-500 leading-relaxed mt-1'>
+                                        Your application did not meet criteria. You can update details and apply again.
+                                    </p>
+                                    <button 
+                                        onClick={() => setShowDeliveryModal(true)} 
+                                        className='mt-5 w-full py-3 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2'
+                                    >
+                                        APPLY AGAIN <ArrowRight className="w-3.5 h-3.5" />
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <div className='w-12 h-12 rounded-2xl bg-indigo-100/80 text-indigo-600 flex items-center justify-center mb-4 shadow-inner'>
+                                        <Truck className="w-6 h-6" />
+                                    </div>
+                                    <h4 className='text-base font-bold text-gray-900'>Become a Wishmaster</h4>
+                                    <p className='text-sm text-gray-500 leading-relaxed mt-1'>
+                                        Join our delivery fleet! Earn on your own schedule by delivering fashion to customers.
+                                    </p>
+                                    <button 
+                                        onClick={() => setShowDeliveryModal(true)} 
+                                        className='mt-5 w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2'
+                                    >
+                                        JOIN THE FLEET <ArrowRight className="w-3.5 h-3.5" />
                                     </button>
                                 </>
                             )}
@@ -621,6 +730,102 @@ const Profile = () => {
                             </button>
                             <p className="text-center text-[10px] text-gray-400 mt-3">
                                 By submitting, you agree to our Seller Terms & Conditions.
+                            </p>
+                        </div>
+
+                    </div>
+                </div>
+            )}
+
+            {/* Become a Delivery Partner Modal */}
+            {showDeliveryModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl relative animate-fade-in max-h-[90vh] flex flex-col overflow-hidden">
+                        
+                        <div className="shrink-0 pt-6 px-6 sm:px-8 pb-4 border-b border-gray-100 relative">
+                            <button 
+                                type="button"
+                                onClick={() => setShowDeliveryModal(false)}
+                                className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 transition-colors bg-gray-100 hover:bg-gray-200 rounded-full p-1"
+                            >
+                                <XCircle className="w-5 h-5" />
+                            </button>
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center shadow-sm shrink-0">
+                                    <Truck className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">Wishmaster Fleet Application</h2>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Deliver smiles and earn on your schedule.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 sm:px-8 py-6 custom-scrollbar bg-gray-50/30">
+                            <form id="deliveryForm" onSubmit={onDeliveryApply} className="flex flex-col gap-6">
+                                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                                    <h3 className="text-[11px] font-bold tracking-widest text-indigo-900 mb-4 flex items-center gap-2 uppercase">
+                                        <Truck className="w-3.5 h-3.5" /> Fleet Information
+                                    </h3>
+                                    <div className="flex flex-col gap-4">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-700 uppercase mb-1 block">Vehicle Type & Model <span className="text-red-500">*</span></label>
+                                            <input 
+                                                type="text" 
+                                                required 
+                                                placeholder="e.g. Honda Activa 6G"
+                                                value={deliveryForm.vehicleDetails}
+                                                onChange={(e) => setDeliveryForm({...deliveryForm, vehicleDetails: e.target.value})}
+                                                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all text-sm bg-gray-50/50"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-700 uppercase mb-1 block">Driving License Number <span className="text-red-500">*</span></label>
+                                            <input 
+                                                type="text" 
+                                                required
+                                                placeholder="DL-XXXX-XXXXXXX"
+                                                value={deliveryForm.drivingLicense}
+                                                onChange={(e) => setDeliveryForm({...deliveryForm, drivingLicense: e.target.value})}
+                                                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all text-sm bg-gray-50/50 uppercase font-mono"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-700 uppercase mb-1 block">Service City <span className="text-red-500">*</span></label>
+                                            <input 
+                                                type="text" 
+                                                required
+                                                placeholder="e.g. Mumbai"
+                                                value={deliveryForm.serviceCity}
+                                                onChange={(e) => setDeliveryForm({...deliveryForm, serviceCity: e.target.value})}
+                                                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all text-sm bg-gray-50/50"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div className="shrink-0 p-6 sm:px-8 bg-white border-t border-gray-100">
+                            <button 
+                                form="deliveryForm"
+                                type="submit" 
+                                disabled={applyingDelivery}
+                                className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 text-xs tracking-wide"
+                            >
+                                {applyingDelivery ? (
+                                    <span className="flex items-center gap-2">
+                                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                                        SUBMITTING...
+                                    </span>
+                                ) : (
+                                    <>APPLY FOR FLEET <ArrowRight className="w-3.5 h-3.5" /></>
+                                )}
+                            </button>
+                            <p className="text-center text-[10px] text-gray-400 mt-3">
+                                You'll need to pass a background check before approval.
                             </p>
                         </div>
 

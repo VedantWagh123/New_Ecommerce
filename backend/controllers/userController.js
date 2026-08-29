@@ -5,6 +5,7 @@ import userModel from "../models/userModel.js";
 import { v2 as cloudinary } from "cloudinary";
 import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
+import { getIO } from "../config/socket.js";
 
 
 const createToken = (id) => {
@@ -306,6 +307,70 @@ const deleteSeller = async (req, res) => {
     }
 }
 
+// User function: Apply for Delivery Partner
+const applyDeliveryPartner = async (req, res) => {
+    try {
+        const { userId, vehicleDetails, drivingLicense, serviceCity } = req.body;
+        const user = await userModel.findByIdAndUpdate(userId, { 
+            deliveryStatus: 'pending',
+            deliveryVehicle: vehicleDetails,
+            drivingLicense,
+            serviceCity
+        }, { new: true });
+        
+        if (!user) return res.json({ success: false, message: "User not found" });
+        res.json({ success: true, message: "Application submitted successfully! Admin will review your details." });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+// Admin function: Get all Delivery Partners
+const getDeliveryPartners = async (req, res) => {
+    try {
+        const partners = await userModel.find({ 
+            $or: [{ isDeliveryPartner: true }, { role: 'delivery' }, { deliveryStatus: { $in: ['pending', 'approved', 'rejected'] } }] 
+        }).select('-password').sort({ _id: -1 });
+        res.json({ success: true, partners });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+// Admin function: Approve Delivery Partner
+const approveDeliveryPartner = async (req, res) => {
+    try {
+        const { partnerId } = req.body;
+        const partner = await userModel.findByIdAndUpdate(partnerId, { 
+            deliveryStatus: 'approved', 
+            isDeliveryPartner: true 
+        }, { new: true });
+        if (!partner) return res.json({ success: false, message: "Partner not found" });
+        res.json({ success: true, message: `Delivery Partner "${partner.name}" approved successfully!`, partner });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+// Admin function: Reject Delivery Partner
+const rejectDeliveryPartner = async (req, res) => {
+    try {
+        const { partnerId } = req.body;
+        const partner = await userModel.findByIdAndUpdate(partnerId, { 
+            deliveryStatus: 'rejected',
+            isDeliveryPartner: false
+        }, { new: true });
+        if (!partner) return res.json({ success: false, message: "Partner not found" });
+        res.json({ success: true, message: `Delivery Partner "${partner.name}" rejected.`, partner });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
 // Super Admin function: Get all Sub-Admins
 const getSubAdmins = async (req, res) => {
     try {
@@ -522,4 +587,27 @@ const resetPassword = async (req, res) => {
         res.json({ success: false, message: error.message });
     }
 }
-export { loginUser, registerUser, adminLogin, getSellers, approveSeller, rejectSeller, deleteSeller, getSubAdmins, addSubAdmin, deleteSubAdmin, getUserProfile, updateUserProfile, forgotPassword, verifyResetOtp, resetPassword, verifyOtp, resendOtp }
+// Toggle Delivery Partner Online Status
+const toggleDeliveryOnline = async (req, res) => {
+    try {
+        const { userId } = req.body;
+        const { isDeliveryOnline } = req.body;
+        
+        const user = await userModel.findById(userId);
+        if (!user || !user.isDeliveryPartner) {
+            return res.json({ success: false, message: 'User not authorized' });
+        }
+        
+        user.isDeliveryOnline = isDeliveryOnline;
+        await user.save();
+        
+        getIO().emit('wishmaster-updated');
+        
+        res.json({ success: true, message: 'Status updated successfully' });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+export { loginUser, registerUser, adminLogin, getSellers, approveSeller, rejectSeller, deleteSeller, getSubAdmins, addSubAdmin, deleteSubAdmin, getUserProfile, updateUserProfile, forgotPassword, verifyResetOtp, resetPassword, verifyOtp, resendOtp, applyDeliveryPartner, getDeliveryPartners, approveDeliveryPartner, rejectDeliveryPartner, toggleDeliveryOnline }

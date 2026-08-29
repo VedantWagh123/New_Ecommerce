@@ -1,6 +1,7 @@
 import React from 'react';
 import { assets } from '../assets/assets';
 import { LogOut, ShieldCheck, UserCheck } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 const Navbar = ({ setToken, setRole, role }) => {
   const getRoleName = (r) => {
@@ -20,6 +21,7 @@ const Navbar = ({ setToken, setRole, role }) => {
       </div>
 
       <div className='flex items-center gap-4'>
+        <NotificationBell />
         <div className='hidden md:flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-slate-100/90 border border-slate-200 text-xs font-semibold text-slate-700'>
           <div className='w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shadow-xs'>
             <UserCheck className='w-4 h-4 text-emerald-400' />

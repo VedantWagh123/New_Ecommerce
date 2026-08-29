@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ALL_STATUSES, STATUS_STEPS, getStatusStepIndex, getStatusBadgeStyle } from '../utils/orderStatus';
 
-const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdate, onDeleteOrder }) => {
+const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdate, onDeleteOrder, wishmasters = [], onAssignWishmaster }) => {
     if (!isOpen || !order) return null;
 
     const {
@@ -20,6 +20,7 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
     const [note, setNote] = useState('');
     const [isUpdating, setIsUpdating] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [selectedPartnerId, setSelectedPartnerId] = useState('');
 
     useEffect(() => {
         setSelectedStatus(status);
@@ -43,6 +44,19 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
 
     const handlePrintSummary = () => {
         window.print();
+    };
+
+    const handleAssignWishmaster = async () => {
+        if (!selectedPartnerId) return;
+        setIsUpdating(true);
+        try {
+            await onAssignWishmaster(_id, selectedPartnerId);
+            setSelectedPartnerId('');
+        } catch (error) {
+            console.error('Failed to assign wishmaster:', error);
+        } finally {
+            setIsUpdating(false);
+        }
     };
 
     return (
@@ -198,12 +212,20 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
                                 <span className="text-gray-500">Payment Method</span>
                                 <span className="font-bold text-gray-900 uppercase">{paymentMethod}</span>
                             </div>
-                            <div className="flex justify-between">
+                            <div className="flex justify-between mt-1 items-center">
                                 <span className="text-gray-500">Payment Status</span>
                                 <span className={`font-bold px-2 py-0.5 rounded text-[11px] ${payment ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                                    {payment ? 'Paid' : 'Pending'}
+                                    {paymentMethod === 'COD' ? (payment ? 'COD Collected' : 'COD Pending') : (payment ? 'Paid' : 'Pending')}
                                 </span>
                             </div>
+                            {paymentMethod === 'COD' && order.codReceipt && order.codReceipt.status === 'Collected' && (
+                                <div className="mt-2 p-2 bg-emerald-50 rounded-lg border border-emerald-100 text-[10px]">
+                                    <p className="font-bold text-emerald-800 mb-1">COD Receipt:</p>
+                                    <p className="text-emerald-700">Method: {order.codReceipt.method}</p>
+                                    <p className="text-emerald-700">Amount: {currency}{order.codReceipt.amount}</p>
+                                    <p className="text-emerald-700">Time: {new Date(order.codReceipt.collectedAt).toLocaleString()}</p>
+                                </div>
+                            )}
                             <div className="border-t pt-2 flex justify-between text-sm font-black text-gray-900">
                                 <span>Total Amount Paid</span>
                                 <span>{currency}{amount.toFixed(2)}</span>
@@ -246,6 +268,45 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
                                     <div className="w-full border border-gray-200 bg-gray-50 rounded-xl p-2.5 text-xs font-bold text-gray-500 text-center uppercase tracking-wider">
                                         Pending Seller Acceptance
                                     </div>
+                                ) : status === 'Ready for Pickup' || status === 'Assigned' ? (
+                                    <div className="space-y-2">
+                                        <select
+                                            value={selectedPartnerId || order.deliveryPartnerId || ''}
+                                            onChange={(e) => setSelectedPartnerId(e.target.value)}
+                                            className="w-full border border-gray-300 rounded-xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-black bg-white cursor-pointer"
+                                        >
+                                            <option value="" disabled>Select Wishmaster to Assign...</option>
+                                            {wishmasters.map(partner => (
+                                                <option key={partner._id} value={partner._id} disabled={!partner.isDeliveryOnline}>
+                                                    {partner.name} - {partner.deliveryVehicle} ({partner.serviceCity}) - {partner.isDeliveryOnline ? '🟢 Online' : '🔴 Offline'}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            type="button"
+                                            disabled={isUpdating || !selectedPartnerId || selectedPartnerId === order.deliveryPartnerId}
+                                            onClick={handleAssignWishmaster}
+                                            className={`w-full px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs ${
+                                                isUpdating || !selectedPartnerId || selectedPartnerId === order.deliveryPartnerId
+                                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-black hover:bg-gray-800 text-white cursor-pointer'
+                                            }`}
+                                        >
+                                            {status === 'Assigned' ? 'Reassign Wishmaster' : 'Assign Wishmaster'}
+                                        </button>
+                                    </div>
+                                ) : ['Assigned', 'Accepted (Delivery)', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered'].includes(status) ? (
+                                    <div className="flex flex-col gap-2 w-full">
+                                        <div className="w-full border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-xl p-2.5 text-xs font-bold text-center flex items-center justify-center gap-1.5">
+                                            <span>✅</span> {status}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            {status === 'Delivered' && (
+                                                <button onClick={() => { setSelectedStatus('Returned'); onStatusUpdate(_id, 'Returned', note); }} className="flex-1 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-bold transition-colors">Mark Returned</button>
+                                            )}
+                                            <button onClick={() => { setSelectedStatus('Cancelled'); onStatusUpdate(_id, 'Cancelled', note); }} className="flex-1 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-bold transition-colors">Cancel Order</button>
+                                        </div>
+                                    </div>
                                 ) : (
                                     <select
                                         value={selectedStatus}
@@ -254,8 +315,8 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
                                         className="w-full border border-gray-300 rounded-xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-black bg-white cursor-pointer disabled:opacity-50"
                                     >
                                         <option value={status}>{status}</option>
-                                        {['Packed', 'Ready to Ship', 'Handed to Logistics', 'Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled']
-                                          .slice(['Packed', 'Ready to Ship', 'Handed to Logistics', 'Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled'].indexOf(status) + 1)
+                                        {['Packed', 'Ready for Pickup', 'Assigned', 'Accepted (Delivery)', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled']
+                                          .slice(['Packed', 'Ready for Pickup', 'Assigned', 'Accepted (Delivery)', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled'].indexOf(status) + 1)
                                           .map((st) => (
                                             <option key={st} value={st}>
                                                 {st}

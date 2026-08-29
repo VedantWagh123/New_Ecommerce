@@ -16,6 +16,7 @@ const couponSchema = new mongoose.Schema({
     isActive: { type: Boolean, default: true },
     isOneTime: { type: Boolean, default: false },
     isUsed: { type: Boolean, default: false },
+    usedBy: { type: Array, default: [] },
     linkedEmail: { type: String, default: null }
 }, { timestamps: true });
 

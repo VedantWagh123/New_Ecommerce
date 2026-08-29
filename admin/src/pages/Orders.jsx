@@ -1,12 +1,14 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useContext } from 'react';
 import axios from 'axios';
 import { backendUrl, currency } from '../App';
 import { toast } from 'react-toastify';
 import { ALL_STATUSES, ORDER_STATUS, getStatusBadgeStyle } from '../utils/orderStatus';
 import AdminOrderModal from '../components/AdminOrderModal';
+import { SocketContext } from '../context/SocketContext';
 
 const Orders = ({ token }) => {
   const [orders, setOrders] = useState([]);
+  const [wishmasters, setWishmasters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -65,7 +67,6 @@ const Orders = ({ token }) => {
 
   const fetchAllOrders = async () => {
     if (!token) return;
-    setLoading(true);
     try {
       const response = await axios.post(
         backendUrl + '/api/order/list',
@@ -108,6 +109,42 @@ const Orders = ({ token }) => {
     }
   };
 
+  const fetchWishmasters = async () => {
+    if (!token) return;
+    try {
+      const response = await axios.get(
+        backendUrl + '/api/user/delivery-partners',
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        // Only keep approved Wishmasters
+        setWishmasters(response.data.partners.filter(p => p.deliveryStatus === 'approved'));
+      }
+    } catch (error) {
+      console.error("Error fetching Wishmasters:", error);
+    }
+  };
+
+  const assignWishmasterHandler = async (orderId, partnerId) => {
+    try {
+      const response = await axios.post(
+        backendUrl + '/api/order/assign-wishmaster',
+        { orderId, partnerId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        toast.success(response.data.message);
+        fetchAllOrders();
+        setSelectedOrderDetails(response.data.order);
+      } else {
+        toast.error(response.data.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error.message || 'Error assigning wishmaster');
+    }
+  };
+
   const handleCopyId = (id, e) => {
     e.stopPropagation();
     navigator.clipboard.writeText(id);
@@ -123,8 +160,26 @@ const Orders = ({ token }) => {
     }));
   };
 
+  const { socket } = useContext(SocketContext);
+
+  useEffect(() => {
+    if (socket) {
+      const handleOrderUpdate = () => fetchAllOrders();
+      const handleWishmasterUpdate = () => fetchWishmasters();
+      
+      socket.on('order-updated', handleOrderUpdate);
+      socket.on('wishmaster-updated', handleWishmasterUpdate);
+      
+      return () => {
+        socket.off('order-updated', handleOrderUpdate);
+        socket.off('wishmaster-updated', handleWishmasterUpdate);
+      };
+    }
+  }, [socket, token]);
+
   useEffect(() => {
     fetchAllOrders();
+    fetchWishmasters();
   }, [token]);
 
   // Group orders by unique customer
@@ -710,6 +765,16 @@ const Orders = ({ token }) => {
                                   <span className="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-xl text-[10px] font-bold border border-gray-200 uppercase tracking-wider text-center">
                                     Pending Seller Acceptance
                                   </span>
+                                ) : ['Assigned', 'Accepted (Delivery)', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered'].includes(currentStatus) ? (
+                                  <div className="flex gap-1.5 items-center">
+                                    <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-[11px] font-bold border border-emerald-200 whitespace-nowrap">
+                                      ✅ {currentStatus}
+                                    </span>
+                                    {currentStatus === 'Delivered' && (
+                                      <button onClick={() => statusHandler(order._id, 'Returned')} className="px-2 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-bold transition-colors">Return</button>
+                                    )}
+                                    <button onClick={() => statusHandler(order._id, 'Cancelled')} className="px-2 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-bold transition-colors">Cancel</button>
+                                  </div>
                                 ) : (
                                   <select
                                     value={currentStatus}
@@ -717,8 +782,8 @@ const Orders = ({ token }) => {
                                     className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${getStatusBadgeStyle(currentStatus)}`}
                                   >
                                     <option value={currentStatus}>{currentStatus}</option>
-                                    {['Packed', 'Ready to Ship', 'Handed to Logistics', 'Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled']
-                                      .slice(['Packed', 'Ready to Ship', 'Handed to Logistics', 'Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled'].indexOf(currentStatus) + 1)
+                                    {['Packed', 'Ready for Pickup', 'Assigned', 'Accepted (Delivery)', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled']
+                                      .slice(['Packed', 'Ready for Pickup', 'Assigned', 'Accepted (Delivery)', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled'].indexOf(currentStatus) + 1)
                                       .map(st => (
                                         <option key={st} value={st}>{st}</option>
                                       ))
@@ -884,6 +949,18 @@ const Orders = ({ token }) => {
                             <span className="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-xl text-[10px] font-bold border border-gray-200 uppercase tracking-wider text-center block w-full max-w-[140px]">
                               Pending Seller Acceptance
                             </span>
+                          ) : ['Assigned', 'Accepted (Delivery)', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered'].includes(currentStatus) ? (
+                            <div className="flex flex-col gap-1 w-full max-w-[140px]">
+                              <span className="px-2 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-[11px] font-bold border border-emerald-200 text-center">
+                                ✅ {currentStatus}
+                              </span>
+                              <div className="flex gap-1">
+                                {currentStatus === 'Delivered' && (
+                                  <button onClick={() => statusHandler(order._id, 'Returned')} className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded text-[10px] font-bold flex-1 transition-colors">Return</button>
+                                )}
+                                <button onClick={() => statusHandler(order._id, 'Cancelled')} className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[10px] font-bold flex-1 transition-colors">Cancel</button>
+                              </div>
+                            </div>
                           ) : (
                             <select
                               value={currentStatus}
@@ -891,8 +968,8 @@ const Orders = ({ token }) => {
                               className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer w-full max-w-[140px] ${getStatusBadgeStyle(currentStatus)}`}
                             >
                               <option value={currentStatus}>{currentStatus}</option>
-                              {['Packed', 'Ready to Ship', 'Handed to Logistics', 'Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled']
-                                .slice(['Packed', 'Ready to Ship', 'Handed to Logistics', 'Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled'].indexOf(currentStatus) + 1)
+                              {['Packed', 'Ready for Pickup', 'Assigned', 'Accepted (Delivery)', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled']
+                                .slice(['Packed', 'Ready for Pickup', 'Assigned', 'Accepted (Delivery)', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled'].indexOf(currentStatus) + 1)
                                 .map(st => (
                                   <option key={st} value={st}>{st}</option>
                                 ))
@@ -1014,6 +1091,8 @@ const Orders = ({ token }) => {
         currency={currency}
         onStatusUpdate={statusHandler}
         onDeleteOrder={deleteOrderHandler}
+        wishmasters={wishmasters}
+        onAssignWishmaster={assignWishmasterHandler}
       />
 
       {/* Delete Confirmation Modal */}

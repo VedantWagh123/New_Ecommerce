@@ -1,4 +1,5 @@
 import userModel from "../models/userModel.js"
+import orderModel from "../models/orderModel.js"
 
 
 // add products to user cart
@@ -55,8 +56,9 @@ const getUserCart = async (req,res) => {
         }
 
         let cartData = (await userData.cartData) || {};
+        const pastOrder = await orderModel.findOne({ userId, couponCode: 'BUNDLE20' });
 
-        res.json({ success: true, cartData, karmaScore: userData.karmaScore ?? 100 })
+        res.json({ success: true, cartData, karmaScore: userData.karmaScore ?? 100, hasUsedBundle: !!pastOrder })
 
     } catch (error) {
         console.log(error)

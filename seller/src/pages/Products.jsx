@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -14,6 +14,7 @@ import {
   Tag, 
   Boxes 
 } from 'lucide-react';
+import { SocketContext } from '../context/SocketContext';
 
 const currency = '$';
 
@@ -50,6 +51,18 @@ const Products = ({ token, searchQuery }) => {
       fetchProducts();
     }
   }, [token]);
+
+  const { socket } = useContext(SocketContext);
+
+  useEffect(() => {
+    if (socket) {
+      const handleUpdate = () => fetchProducts();
+      socket.on('product-updated', handleUpdate);
+      return () => {
+        socket.off('product-updated', handleUpdate);
+      }
+    }
+  }, [socket]);
 
   const handleDelete = async (id) => {
     try {

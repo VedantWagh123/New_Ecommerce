@@ -26,6 +26,13 @@ const userSchema = new mongoose.Schema({
     storeDescription: { type: String, default: '' },
     storePhone: { type: String, default: '' },
     storeLogo: { type: String, default: '' },
+    isDeliveryPartner: { type: Boolean, default: false },
+    isDeliveryOnline: { type: Boolean, default: false },
+    deliveryStatus: { type: String, enum: ['none', 'pending', 'approved', 'rejected'], default: 'none' },
+    deliveryVehicle: { type: String, default: '' },
+    drivingLicense: { type: String, default: '' },
+    serviceCity: { type: String, default: '' },
+    deliveryEarnings: { type: Number, default: 0 },
     bankDetails: {
         accountHolder: { type: String, default: '' },
         accountNumber: { type: String, default: '' },

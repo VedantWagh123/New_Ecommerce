@@ -1,7 +1,8 @@
 import axios from 'axios'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useContext } from 'react'
 import { backendUrl, currency } from '../App'
 import { toast } from 'react-toastify'
+import { SocketContext } from '../context/SocketContext'
 
 const List = ({ token }) => {
 
@@ -41,6 +42,18 @@ const List = ({ token }) => {
       toast.error(error.message)
     }
   }
+
+  const { socket } = useContext(SocketContext);
+
+  useEffect(() => {
+    if (socket) {
+      const handleUpdate = () => fetchList();
+      socket.on('product-updated', handleUpdate);
+      return () => {
+        socket.off('product-updated', handleUpdate);
+      }
+    }
+  }, [socket]);
 
   useEffect(() => {
     fetchList()

@@ -8,6 +8,7 @@ import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import PendingApproval from './components/PendingApproval';
 import RejectedScreen from './components/RejectedScreen';
+import { SocketProvider } from './context/SocketContext';
 
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -148,11 +149,12 @@ const App = () => {
   }
 
   return (
-    <div className="h-screen bg-slate-50 flex overflow-hidden">
-      <ToastContainer position="top-right" autoClose={3000} />
-      
-      {/* Left Sidebar */}
-      <Sidebar setToken={setToken} storeInfo={storeInfo} />
+    <SocketProvider token={token} role="seller">
+      <div className="h-screen bg-slate-50 flex overflow-hidden">
+        <ToastContainer position="top-right" autoClose={3000} />
+        
+        {/* Left Sidebar */}
+        <Sidebar setToken={setToken} storeInfo={storeInfo} />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full">
@@ -183,6 +185,7 @@ const App = () => {
         </main>
       </div>
     </div>
+    </SocketProvider>
   );
 };
 

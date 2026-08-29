@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { 
@@ -14,6 +14,8 @@ import {
   X,
   CreditCard
 } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { SocketContext } from '../context/SocketContext';
 
 const currency = '$';
 
@@ -23,6 +25,9 @@ const Orders = ({ token, searchQuery }) => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
+
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
 
@@ -51,6 +56,30 @@ const Orders = ({ token, searchQuery }) => {
       fetchOrders();
     }
   }, [token]);
+
+  const { socket } = useContext(SocketContext);
+
+  useEffect(() => {
+    if (socket) {
+      const handleUpdate = () => fetchOrders();
+      socket.on('order-updated', handleUpdate);
+      return () => {
+        socket.off('order-updated', handleUpdate);
+      }
+    }
+  }, [socket]);
+
+  // Open specific order from notification click
+  useEffect(() => {
+    if (orders.length > 0 && location.state?.openOrderId) {
+      const targetOrder = orders.find(o => o._id === location.state.openOrderId);
+      if (targetOrder) {
+        setSelectedOrder(targetOrder);
+        // Clear the state so it doesn't reopen on page refresh
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    }
+  }, [orders, location, navigate]);
 
   const handleStatusUpdate = async (orderId, newStatus) => {
     try {
@@ -99,7 +128,7 @@ const Orders = ({ token, searchQuery }) => {
 
         {/* Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-          {['all', 'Packing', 'Shipped', 'Out for Delivery', 'Delivered'].map(status => (
+          {['all', 'Packing', 'Accepted', 'Packed', 'Ready for Pickup'].map(status => (
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
@@ -153,7 +182,7 @@ const Orders = ({ token, searchQuery }) => {
                         Cancel Requested
                      </span>
                   ) : (() => {
-                     const SELLER_STATUSES = ['Packing', 'Accepted', 'Packed', 'Ready to Ship', 'Handed to Logistics'];
+                     const SELLER_STATUSES = ['Packing', 'Accepted', 'Packed', 'Ready for Pickup'];
                      const currentIdx = SELLER_STATUSES.indexOf(order.status);
                      
                      if (currentIdx === -1) {

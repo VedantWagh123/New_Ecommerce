@@ -1,5 +1,6 @@
 import couponModel from "../models/couponModel.js";
 import productModel from "../models/productModel.js";
+import orderModel from "../models/orderModel.js";
 
 // Add a new coupon
 const addCoupon = async (req, res) => {
@@ -65,15 +66,35 @@ const toggleCoupon = async (req, res) => {
 // THE COMPLEX COUPON ENGINE: Apply Coupon
 const applyCoupon = async (req, res) => {
     try {
-        const { code, cartData } = req.body; // cartData: { [itemId]: { [size]: quantity } }
+        const { code, cartData, userId } = req.body; // cartData: { [itemId]: { [size]: quantity } }
         
-        const coupon = await couponModel.findOne({ code: code.toUpperCase(), isActive: true });
-        if (!coupon) {
+        let coupon = await couponModel.findOne({ code: code.toUpperCase(), isActive: true });
+        
+        if (!coupon && code.toUpperCase() === 'BUNDLE20') {
+            const pastOrder = await orderModel.findOne({ userId, couponCode: 'BUNDLE20' });
+            if (pastOrder) {
+                return res.json({ success: false, message: "You have already used this bundle discount on a previous order." });
+            }
+            coupon = {
+                code: 'BUNDLE20',
+                type: 'percentage',
+                value: 20,
+                minCartValue: 0,
+                conditions: { categories: [], subCategories: [] },
+                isOneTime: true,
+                isUsed: false,
+                usedBy: []
+            };
+        } else if (!coupon) {
             return res.json({ success: false, message: "Invalid or expired coupon code" });
         }
 
         if (coupon.isOneTime && coupon.isUsed) {
             return res.json({ success: false, message: "This coupon has already been used and is only valid for one order." });
+        }
+
+        if (userId && coupon.usedBy && coupon.usedBy.includes(userId)) {
+            return res.json({ success: false, message: "You have already used this coupon on a previous order." });
         }
 
         // Fetch products in cart

@@ -56,7 +56,7 @@ const AutoBundlerModal = ({ isOpen, onClose, primaryProduct, primarySize }) => {
         return () => clearInterval(timer);
     }, [isOpen, timeLeft, onClose]);
 
-    if (!isOpen || !primaryProduct || bundledProducts.length === 0) return null;
+    if (!isOpen || !primaryProduct || bundledProducts.length === 0 || localStorage.getItem('bundleUsed') === 'true') return null;
     const hasTwoBundle = bundledProducts.length >= 2;
 
     const formatTime = (seconds) => {
@@ -75,9 +75,7 @@ const AutoBundlerModal = ({ isOpen, onClose, primaryProduct, primarySize }) => {
             addToCart(p._id, p.sizes[0]);
         });
         
-        setCouponData({ code: 'BUNDLE20', discount: savings, isBundle: true });
-        
-        toast.success("🎉 Bundle Added! 20% Discount Applied.");
+        toast.success("🎉 Bundle items added to cart!");
         onClose();
         navigate('/cart');
     };

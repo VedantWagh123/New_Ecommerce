@@ -17,7 +17,8 @@ import {
   BarChart3,
   Layers,
   Video,
-  Settings
+  Settings,
+  Truck
 } from 'lucide-react';
 
 const Sidebar = ({ role }) => {
@@ -116,6 +117,12 @@ const Sidebar = ({ role }) => {
       to: '/sellers',
       label: 'Sellers Hub',
       icon: Store,
+      roles: ['super_admin']
+    },
+    {
+      to: '/delivery-partners',
+      label: 'Fleet / Delivery',
+      icon: Truck,
       roles: ['super_admin']
     },
     {
