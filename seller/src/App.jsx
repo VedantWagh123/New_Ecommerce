@@ -148,21 +148,21 @@ const App = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="h-screen bg-slate-50 flex overflow-hidden">
       <ToastContainer position="top-right" autoClose={3000} />
       
       {/* Left Sidebar */}
       <Sidebar setToken={setToken} storeInfo={storeInfo} />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-full">
         <Navbar
           storeInfo={storeInfo}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
         />
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto bg-slate-50 custom-scrollbar">
           <Routes>
             <Route path="/" element={<Dashboard token={token} searchQuery={searchQuery} />} />
             <Route path="/products" element={<Products token={token} searchQuery={searchQuery} />} />

@@ -40,7 +40,7 @@ const Sidebar = ({ setToken, storeInfo }) => {
   ];
 
   return (
-    <aside className="w-64 bg-white border-r border-slate-200 min-h-screen flex flex-col justify-between shrink-0 shadow-sm z-20">
+    <aside className="w-64 bg-white border-r border-slate-200 h-full overflow-y-auto custom-scrollbar flex flex-col justify-between shrink-0 shadow-sm z-20">
       <div>
         {/* Brand Header */}
         <div className="p-6 border-b border-slate-100 flex items-center gap-3">
