@@ -1,4 +1,5 @@
 import React from 'react'
+import { Link } from 'react-router-dom'
 import { assets } from '../assets/assets'
 
 const Footer = () => {
@@ -17,11 +18,11 @@ const Footer = () => {
 
         <div>
             <p className='text-xl font-medium mb-5'>COMPANY</p>
-            <ul className='flex flex-col gap-1 text-gray-600'>
-                <li>Home</li>
-                <li>About us</li>
-                <li>Delivery</li>
-                <li>Privacy policy</li>
+            <ul className='flex flex-col gap-2 text-gray-600'>
+                <li><Link to='/' className='hover:text-black hover:underline transition-colors'>Home</Link></li>
+                <li><Link to='/about' className='hover:text-black hover:underline transition-colors'>About us</Link></li>
+                <li><Link to='/collection' className='hover:text-black hover:underline transition-colors'>Delivery</Link></li>
+                <li><Link to='/privacy-policy' className='hover:text-black hover:underline transition-colors'>Privacy policy</Link></li>
                 <li>
                     <a href="http://localhost:5175" target="_blank" rel="noopener noreferrer" className="text-black font-semibold hover:underline flex items-center gap-1">
                         <span>Sell on Forever</span>
@@ -33,10 +34,17 @@ const Footer = () => {
 
         <div>
             <p className='text-xl font-medium mb-5'>GET IN TOUCH</p>
-            <ul className='flex flex-col gap-1 text-gray-600'>
-                <li>+1-212-456-7890</li>
-                <li>+1-212-456-7890</li>
-                <li>contact@forever.com</li>
+            <ul className='flex flex-col gap-2 text-gray-600'>
+                <li>
+                    <a href="tel:+12124567890" className='hover:text-black hover:underline transition-colors flex items-center gap-2'>
+                        📞 +1-212-456-7890
+                    </a>
+                </li>
+                <li>
+                    <a href="mailto:contact@forever.com" className='hover:text-black hover:underline transition-colors flex items-center gap-2'>
+                        ✉️ contact@forever.com
+                    </a>
+                </li>
             </ul>
         </div>
 

@@ -24,6 +24,7 @@ import Verify from './pages/Verify'
 import SellerRegisterRedirect from './pages/SellerRegisterRedirect'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
+import PrivacyPolicy from './pages/PrivacyPolicy'
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -59,6 +60,7 @@ const App = () => {
           <Route path='/seller/register' element={<SellerRegisterRedirect />} />
           <Route path='/forgot-password' element={<ForgotPassword />} />
           <Route path='/reset-password/:token' element={<ResetPassword />} />
+          <Route path='/privacy-policy' element={<PrivacyPolicy />} />
         </Routes>
       </div>
       <CompareTray />
