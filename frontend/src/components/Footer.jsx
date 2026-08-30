@@ -50,9 +50,17 @@ const Footer = () => {
 
       </div>
 
-        <div>
-            <hr />
-            <p className='py-5 text-sm text-center'>Copyright 2024@ forever.com - All Right Reserved.</p>
+        <div className='border-t border-gray-200'>
+            <div className='py-6 flex flex-col md:flex-row items-center justify-between text-sm text-gray-500'>
+                <p>
+                    © {new Date().getFullYear()} Forever Fashion. All rights reserved.
+                </p>
+                <div className='flex gap-4 mt-3 md:mt-0'>
+                    <a href="#" className='hover:text-black transition-colors'>Terms of Service</a>
+                    <Link to="/privacy-policy" className='hover:text-black transition-colors'>Privacy Policy</Link>
+                    <a href="#" className='hover:text-black transition-colors'>Cookies</a>
+                </div>
+            </div>
         </div>
 
     </div>
