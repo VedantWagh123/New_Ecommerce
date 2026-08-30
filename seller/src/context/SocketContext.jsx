@@ -22,16 +22,23 @@ export const SocketProvider = ({ children, token, role }) => {
                 toast.info(`🔔 ${notification.title}: ${notification.message}`);
             });
 
+            const fetchNotifications = () => {
+                axios.get(backendUrl + '/api/notification', { 
+                    headers: { 'x-role': role, Authorization: `Bearer ${token}` } 
+                })
+                .then(res => {
+                    if (res.data.success) {
+                        setNotifications(res.data.notifications);
+                    }
+                })
+                .catch(console.error);
+            };
+
             // Fetch initial notifications
-            axios.get(backendUrl + '/api/notification', { 
-                headers: { 'x-role': role, Authorization: `Bearer ${token}` } 
-            })
-            .then(res => {
-                if (res.data.success) {
-                    setNotifications(res.data.notifications);
-                }
-            })
-            .catch(console.error);
+            fetchNotifications();
+
+            // Refetch on reconnect
+            newSocket.on('connect', fetchNotifications);
 
             return () => newSocket.disconnect();
         } else {

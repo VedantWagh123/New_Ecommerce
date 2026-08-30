@@ -33,7 +33,7 @@ export const currency = '$'
 const App = () => {
 
   const [token, setToken] = useState(localStorage.getItem('token') ? localStorage.getItem('token') : '');
-  const [role, setRole] = useState(localStorage.getItem('role') ? localStorage.getItem('role') : '');
+  const [role, setRole] = useState(localStorage.getItem('role') ? localStorage.getItem('role') : (localStorage.getItem('token') ? 'super_admin' : ''));
 
   useEffect(() => {
     localStorage.setItem('token', token)

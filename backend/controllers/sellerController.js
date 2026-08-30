@@ -7,10 +7,36 @@ import productModel from "../models/productModel.js";
 import orderModel from "../models/orderModel.js";
 import reviewModel from "../models/reviewModel.js";
 import payoutModel from "../models/payoutModel.js";
-import { sendNotification } from "../config/socket.js";
+import settingsModel from "../models/settingsModel.js";
+import { sendNotification, getIO } from "../config/socket.js";
 
 const createToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET);
+};
+
+const calculateSellerShare = (order, sellerId, commissionRate) => {
+    const sellerItems = order.items.filter(i => i.sellerId === sellerId);
+    if (sellerItems.length === 0) return { itemTotal: 0, sellerShare: 0, sellerItems };
+    
+    const itemTotal = sellerItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    
+    let totalDiscount = 0;
+    if (order.subtotal && order.amount) {
+        totalDiscount = Math.max(0, order.subtotal - (order.amount - (order.tax || 0) - (order.platformFee || 0) - (order.deliveryFee || 0)));
+    } else {
+        totalDiscount = order.couponDiscount || 0;
+    }
+
+    let proratedDiscount = 0;
+    if (order.subtotal && order.subtotal > 0) {
+        proratedDiscount = totalDiscount * (itemTotal / order.subtotal);
+    }
+
+    const sellerDiscountBurden = proratedDiscount * 0.5;
+    const baseRevenue = Math.max(0, itemTotal - sellerDiscountBurden);
+    const sellerShare = baseRevenue * (1 - commissionRate);
+
+    return { itemTotal, sellerShare, sellerItems };
 };
 
 // 1. Seller Registration
@@ -605,9 +631,10 @@ const updateSellerOrderStatus = async (req, res) => {
 
         await order.save();
 
-        if (status === 'Ready for Pickup') {
-            await sendNotification('admin', null, 'Order Ready for Pickup', `Order #${order._id.toString().slice(-8).toUpperCase()} is ready for pickup by seller ${sellerStore}.`, order._id);
-        }
+        // Send notification to Admin for ALL status updates
+        await sendNotification('admin', null, `Order ${status}`, `Order #${order._id.toString().slice(-8).toUpperCase()} status updated to ${status} by seller ${sellerStore}.`, order._id);
+
+        getIO().emit('order-updated');
 
         res.json({ success: true, message: `Order status updated to ${status}` });
 
@@ -672,6 +699,9 @@ const getAnalytics = async (req, res) => {
         const sellerId = req.sellerId;
         const { timeframe } = req.query; // 'week', 'month', 'all'
 
+        let settings = await settingsModel.findOne();
+        const commissionRate = settings ? (settings.platformCommission / 100) : 0.10;
+
         const orders = await orderModel.find({ "items.sellerId": sellerId });
 
         let totalRevenue = 0;
@@ -679,13 +709,19 @@ const getAnalytics = async (req, res) => {
         const productSales = {};
 
         orders.forEach(order => {
-            const sellerItems = order.items.filter(i => i.sellerId === sellerId);
+            const { sellerShare, sellerItems, itemTotal } = calculateSellerShare(order, sellerId, commissionRate);
+            
+            // To prorate the net revenue across individual items for productSales
+            // We calculate the ratio of Net Revenue (sellerShare) to Gross Revenue (itemTotal)
+            const netRatio = itemTotal > 0 ? (sellerShare / itemTotal) : 0;
+
             sellerItems.forEach(item => {
-                const itemRevenue = item.price * item.quantity;
+                const itemGrossRevenue = item.price * item.quantity;
+                const itemNetRevenue = itemGrossRevenue * netRatio;
                 totalUnitsSold += item.quantity;
 
                 if (order.status === 'Delivered') {
-                    totalRevenue += itemRevenue;
+                    totalRevenue += itemNetRevenue;
                 }
 
                 if (!productSales[item._id || item.name]) {
@@ -697,7 +733,7 @@ const getAnalytics = async (req, res) => {
                     };
                 }
                 productSales[item._id || item.name].unitsSold += item.quantity;
-                productSales[item._id || item.name].revenue += itemRevenue;
+                productSales[item._id || item.name].revenue += itemNetRevenue;
             });
         });
 
@@ -725,6 +761,9 @@ const getAdvancedProductAnalytics = async (req, res) => {
     try {
         const sellerId = req.sellerId;
         const { startDate, endDate, compStartDate, compEndDate } = req.query;
+
+        let settings = await settingsModel.findOne();
+        const commissionRate = settings ? (settings.platformCommission / 100) : 0.10;
 
         // Helper to run pipeline for a given date range
         const getMetricsForRange = async (start, end) => {
@@ -764,13 +803,16 @@ const getAdvancedProductAnalytics = async (req, res) => {
             let totalOrders = orders.length;
 
             orders.forEach(order => {
+                const { sellerShare } = calculateSellerShare(order, sellerId, commissionRate);
+                
                 const sellerItems = order.items.filter(i => i.sellerId === sellerId);
                 sellerItems.forEach(item => {
                     unitsSold += item.quantity;
-                    if (order.status === 'Delivered') {
-                        revenue += (item.price * item.quantity);
-                    }
                 });
+                
+                if (order.status === 'Delivered') {
+                    revenue += sellerShare;
+                }
             });
 
             return { views, carts, orders: totalOrders, revenue, unitsSold };
@@ -796,13 +838,17 @@ const getAdvancedProductAnalytics = async (req, res) => {
             orderList.forEach(order => {
                 const dateStr = new Date(order.date).toLocaleDateString('default', { month: 'short', day: 'numeric' });
                 if (!trendsMap[dateStr]) trendsMap[dateStr] = { date: dateStr, views: 0, carts: 0, revenue: 0, unitsSold: 0, timestamp: order.date };
+                
+                const { sellerShare } = calculateSellerShare(order, sellerId, commissionRate);
+                
                 const sellerItems = order.items.filter(i => i.sellerId === sellerId);
                 sellerItems.forEach(item => {
                     trendsMap[dateStr].unitsSold += item.quantity;
-                    if (order.status === 'Delivered') {
-                        trendsMap[dateStr].revenue += (item.price * item.quantity);
-                    }
                 });
+
+                if (order.status === 'Delivered') {
+                    trendsMap[dateStr].revenue += sellerShare;
+                }
             });
 
             return Object.values(trendsMap).sort((a, b) => a.timestamp - b.timestamp);
@@ -851,24 +897,27 @@ const getAdvancedProductAnalytics = async (req, res) => {
         });
 
         currentOrdersList.forEach(order => {
-            const sellerItems = order.items.filter(i => i.sellerId === sellerId);
-            const uniqueProductIdsInOrder = new Set(sellerItems.map(i => i._id || i.name));
-            
-            sellerItems.forEach(item => {
-                const pid = item._id || item.name;
-                if (!productMetricsMap[pid]) productMetricsMap[pid] = { views: 0, carts: 0, unitsSold: 0, revenue: 0, orders: 0 };
-                productMetricsMap[pid].unitsSold += item.quantity;
-                if (order.status === 'Delivered') {
-                    productMetricsMap[pid].revenue += (item.price * item.quantity);
-                }
+                const { sellerShare, sellerItems, itemTotal } = calculateSellerShare(order, sellerId, commissionRate);
+                const netRatio = itemTotal > 0 ? (sellerShare / itemTotal) : 0;
+                const uniqueProductIdsInOrder = new Set(sellerItems.map(i => i._id || i.name));
+                
+                sellerItems.forEach(item => {
+                    const pid = item._id || item.name;
+                    if (!productMetricsMap[pid]) productMetricsMap[pid] = { views: 0, carts: 0, unitsSold: 0, revenue: 0, orders: 0 };
+                    
+                    productMetricsMap[pid].unitsSold += item.quantity;
+                    if (order.status === 'Delivered') {
+                        const itemNetRevenue = (item.price * item.quantity) * netRatio;
+                        productMetricsMap[pid].revenue += itemNetRevenue;
+                    }
+                });
+                
+                uniqueProductIdsInOrder.forEach(pid => {
+                    if (productMetricsMap[pid]) {
+                        productMetricsMap[pid].orders += 1;
+                    }
+                });
             });
-            
-            uniqueProductIdsInOrder.forEach(pid => {
-                if (productMetricsMap[pid]) {
-                    productMetricsMap[pid].orders += 1;
-                }
-            });
-        });
 
         // Merge with product details
         const productsList = await productModel.find({ sellerId });
@@ -924,18 +973,24 @@ const getEarnings = async (req, res) => {
     try {
         const sellerId = req.sellerId;
 
+        let settings = await settingsModel.findOne();
+        const commissionRate = settings ? (settings.platformCommission / 100) : 0.10;
+
         const orders = await orderModel.find({ "items.sellerId": sellerId });
         
         let totalEarnings = 0;
         let pendingEarnings = 0;
 
         orders.forEach(order => {
-            const sellerItems = order.items.filter(i => i.sellerId === sellerId);
-            const itemTotal = sellerItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-            const sellerShare = itemTotal * 0.90; // 10% platform fee deducted
+            const { sellerShare } = calculateSellerShare(order, sellerId, commissionRate);
 
             if (order.status === 'Delivered') {
-                totalEarnings += sellerShare;
+                if (order.paymentMethod === 'COD' && order.payment === false) {
+                    // COD delivered but cash not remitted/collected yet
+                    pendingEarnings += sellerShare;
+                } else {
+                    totalEarnings += sellerShare;
+                }
             } else if (order.status !== 'Cancelled') {
                 pendingEarnings += sellerShare;
             }

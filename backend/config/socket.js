@@ -20,12 +20,9 @@ export const initSocket = (server) => {
                 const decoded = jwt.verify(token, process.env.JWT_SECRET);
                 
                 let room = '';
-                if (role === 'admin') {
-                    // admin can just join 'admin' room
-                    // Wait, admin's email needs to be verified. Our admin token is just jwt.sign(email+password)
-                    if (decoded === process.env.ADMIN_EMAIL + process.env.ADMIN_PASSWORD) {
-                        room = 'admin';
-                    }
+                if (['admin', 'super_admin', 'support', 'marketing'].includes(role) || 
+                    (decoded && ['admin', 'super_admin', 'support', 'marketing'].includes(decoded.role))) {
+                    room = 'admin';
                 } else if (role === 'seller') {
                     room = `seller_${decoded.id}`;
                 } else if (role === 'delivery') {

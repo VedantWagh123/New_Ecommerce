@@ -520,7 +520,7 @@ const Product = () => {
                     addToCart(productData._id, size); // will show toast error
                     return;
                   }
-                  addToCart(productData._id, size);
+                  addToCart(productData._id, size, false);
                   setIsBundlerOpen(true);
                 }}
                 className='flex-1 bg-[#ff9f00] hover:bg-amber-600 text-white py-4 rounded-xl text-xs font-bold active:scale-98 transition-all uppercase shadow-md'

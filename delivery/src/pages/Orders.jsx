@@ -75,9 +75,11 @@ const Orders = ({ token, searchQuery }) => {
   useEffect(() => {
     if (socket) {
       const handleUpdate = () => fetchOrders();
+      socket.on('connect', handleUpdate);
       socket.on('new-notification', handleUpdate);
       socket.on('order-updated', handleUpdate);
       return () => {
+        socket.off('connect', handleUpdate);
         socket.off('new-notification', handleUpdate);
         socket.off('order-updated', handleUpdate);
       };

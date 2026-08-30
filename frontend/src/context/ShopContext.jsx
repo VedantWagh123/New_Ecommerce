@@ -40,13 +40,18 @@ const ShopContextProvider = (props) => {
                 toast.info(`🔔 ${notification.title}: ${notification.message}`);
             });
 
-            axios.get(backendUrl + '/api/notification', { headers: { 'x-role': 'user', Authorization: `Bearer ${token}` } })
-                .then(res => {
-                    if (res.data.success) {
-                        setNotifications(res.data.notifications);
-                    }
-                })
-                .catch(console.error);
+            const fetchNotifications = () => {
+                axios.get(backendUrl + '/api/notification', { headers: { 'x-role': 'user', Authorization: `Bearer ${token}` } })
+                    .then(res => {
+                        if (res.data.success) {
+                            setNotifications(res.data.notifications);
+                        }
+                    })
+                    .catch(console.error);
+            };
+
+            fetchNotifications();
+            newSocket.on('connect', fetchNotifications);
 
             return () => newSocket.disconnect();
         } else {
@@ -127,7 +132,7 @@ const ShopContextProvider = (props) => {
         }
     }, [savedForLater]);
 
-    const addToCart = async (itemId, size) => {
+    const addToCart = async (itemId, size, showToast = true) => {
 
         if (!size) {
             toast.error('Select Product Size');
@@ -155,14 +160,14 @@ const ShopContextProvider = (props) => {
             try {
 
                 await axios.post(backendUrl + '/api/cart/add', { itemId, size }, { headers: { Authorization: `Bearer ${token}` } })
-                toast.success('Product added to cart!');
+                if (showToast) toast.success('Product added to cart!');
 
             } catch (error) {
                 console.log(error)
-                toast.error(error.message)
+                if (showToast) toast.error(error.message)
             }
         } else {
-            toast.success('Product added to cart!');
+            if (showToast) toast.success('Product added to cart!');
         }
 
         // Analytics Tracking for ADD_TO_CART

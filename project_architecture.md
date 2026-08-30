@@ -227,6 +227,30 @@ ADMIN:   Shipped → In Transit → Out for Delivery → Delivered
 
 ---
 
+### Upgrade E: Real-time WebSockets & Delivery Partner Application
+
+**Fourth Frontend Panel (Logistics/Delivery App):**
+- **New App (`/delivery`):** Created a completely separate React application for Delivery Partners.
+- **Features:** Delivery partners have their own login, dashboard, pending approval state, order management, and earnings view.
+- **Backend Architecture:** Added `deliveryController.js`, `deliveryRoute.js`, and `deliveryAuth.js` to handle logistics operations securely. Admin panel updated to manage Delivery Partners (`DeliveryPartners.jsx`).
+
+**Socket.IO Integration (Live Updates):**
+- **Real-time Engine (`backend/config/socket.js`):** Integrated WebSockets using `Socket.IO` for instantaneous data sync without polling.
+- **Cross-Panel Push Notifications:** Created a global `NotificationBell` component for Admin, Seller, and Delivery panels. Actions like "Order Placed" instantly send WebSocket events to relevant sellers, and "Status Changed" instantly alerts relevant parties.
+- **Live List Refresh:** Admin lists and Seller orders auto-update in real-time when underlying data changes via socket events.
+
+---
+
+### Upgrade F: Ollama-Powered Natural Language Search Engine (NLU)
+
+**Intelligent Shopping Search:**
+- **NLU Search Endpoint (`/api/ai/nlusearch`):** Upgraded the standard search bar to understand natural human language using local LLM (Ollama).
+- **Intent Extraction:** When a user types "blue casual outfit under 2000 for college", the LLM extracts it into structured JSON filters (`{ color: 'blue', occasion: 'casual', maxPrice: 2000 }`) and queries the database.
+- **Smart Regex Fallback:** If the local LLM is slow or offline, a robust regex-based fallback engine automatically kicks in to parse prices, genders, and categories instantly.
+- **In-Memory Caching:** Implemented an LRU-style `nluCache` on the backend to cache frequent AI search queries, saving LLM processing time.
+
+---
+
 ## 📂 5. Database Schema (Collections)
 
 1. **`users`**: Saare buyers, sellers, aur admins yahi save hote hain. Unke role (`user`, `seller`, `admin`) ke basis pe unhe alag permissions milti hain. Isme fraud prevention ke liye user ka `karmaScore` bhi store hota hai.

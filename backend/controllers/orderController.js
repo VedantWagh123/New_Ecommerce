@@ -7,6 +7,27 @@ import settingsModel from "../models/settingsModel.js";
 import couponModel from "../models/couponModel.js";
 import { sendNotification, getIO } from "../config/socket.js";
 
+// Helper function to notify admin and sellers when an order is placed
+const notifyOrderPlaced = async (orderId) => {
+    try {
+        const order = await orderModel.findById(orderId);
+        if (!order) return;
+        
+        // Notify admin
+        await sendNotification('admin', null, 'New Order Received', `Order #${order._id.toString().slice(-8).toUpperCase()} has been placed successfully.`, order._id);
+        
+        // Notify sellers
+        const sellerIds = [...new Set(order.items.map(item => item.sellerId).filter(Boolean))];
+        for (const sellerId of sellerIds) {
+            if (sellerId !== 'admin') {
+                await sendNotification('seller', sellerId, 'New Order Received', `You have new items to pack for Order #${order._id.toString().slice(-8).toUpperCase()}.`, order._id);
+            }
+        }
+    } catch (error) {
+        console.error("Error sending order notification:", error);
+    }
+};
+
 // Helper to attach sellerId and storeName to order items from Product & User collections
 const enrichItemsWithSellerId = async (items) => {
     if (!Array.isArray(items)) return items;
@@ -156,8 +177,8 @@ const placeOrder = async (req,res) => {
         await markCouponAsUsed(couponCode, userId);
 
         await userModel.findByIdAndUpdate(userId,{cartData:{}})
-        
         getIO().emit('order-updated');
+        await notifyOrderPlaced(newOrder._id);
 
         res.json({success:true,message:"Order Placed", orderId: newOrder._id})
 
@@ -279,8 +300,8 @@ const verifyStripe = async (req,res) => {
         if (success === "true") {
             await orderModel.findByIdAndUpdate(orderId, {payment:true});
             await userModel.findByIdAndUpdate(userId, {cartData: {}})
-            
             getIO().emit('order-updated');
+            await notifyOrderPlaced(orderId);
             
             res.json({success: true});
         } else {
@@ -417,8 +438,8 @@ const verifyRazorpay = async (req,res) => {
         if (orderInfo.status === 'paid') {
             await orderModel.findByIdAndUpdate(orderInfo.receipt,{payment:true});
             await userModel.findByIdAndUpdate(userId,{cartData:{}})
-            
             getIO().emit('order-updated');
+            await notifyOrderPlaced(orderInfo.receipt);
             
             res.json({ success: true, message: "Payment Successful" })
         } else {
@@ -439,17 +460,26 @@ const allOrders = async (req,res) => {
         
         const orders = await orderModel.find({}).lean();
         const userIds = [...new Set(orders.map(o => o.userId).filter(Boolean))];
-        const users = await userModel.find({ _id: { $in: userIds } }, 'karmaScore').lean();
+        const users = await userModel.find({ _id: { $in: userIds } }, 'karmaScore name email').lean();
         
-        const userKarmaMap = {};
+        const userMap = {};
         users.forEach(u => {
-            userKarmaMap[u._id] = u.karmaScore !== undefined ? u.karmaScore : 100;
+            userMap[u._id] = {
+                karmaScore: u.karmaScore !== undefined ? u.karmaScore : 100,
+                name: u.name,
+                email: u.email
+            };
         });
 
-        const enrichedOrders = orders.map(order => ({
-            ...order,
-            karmaScore: order.userId && userKarmaMap[order.userId] !== undefined ? userKarmaMap[order.userId] : 100
-        }));
+        const enrichedOrders = orders.map(order => {
+            const userData = order.userId && userMap[order.userId] ? userMap[order.userId] : null;
+            return {
+                ...order,
+                karmaScore: userData ? userData.karmaScore : 100,
+                userProfileName: userData ? userData.name : null,
+                userProfileEmail: userData ? userData.email : null
+            };
+        });
 
         res.json({success:true,orders: enrichedOrders})
 

@@ -167,10 +167,12 @@ const Orders = ({ token }) => {
       const handleOrderUpdate = () => fetchAllOrders();
       const handleWishmasterUpdate = () => fetchWishmasters();
       
+      socket.on('connect', handleOrderUpdate);
       socket.on('order-updated', handleOrderUpdate);
       socket.on('wishmaster-updated', handleWishmasterUpdate);
       
       return () => {
+        socket.off('connect', handleOrderUpdate);
         socket.off('order-updated', handleOrderUpdate);
         socket.off('wishmaster-updated', handleWishmasterUpdate);
       };
@@ -196,10 +198,11 @@ const Orders = ({ token }) => {
       if (!map[key]) {
         const firstName = order.address?.firstName || 'Guest';
         const lastName = order.address?.lastName || 'User';
+        
         map[key] = {
           id: key,
-          name: `${firstName} ${lastName}`.trim(),
-          email: order.address?.email || 'No email provided',
+          name: order.userProfileName || `${firstName} ${lastName}`.trim(),
+          email: order.userProfileEmail || order.address?.email || 'No email provided',
           phone: order.address?.phone || 'No phone provided',
           address: order.address || {},
           karmaScore: order.karmaScore !== undefined ? order.karmaScore : 100,

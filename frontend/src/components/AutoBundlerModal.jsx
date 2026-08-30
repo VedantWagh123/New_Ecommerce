@@ -56,7 +56,7 @@ const AutoBundlerModal = ({ isOpen, onClose, primaryProduct, primarySize }) => {
         return () => clearInterval(timer);
     }, [isOpen, timeLeft, onClose]);
 
-    if (!isOpen || !primaryProduct || bundledProducts.length === 0 || localStorage.getItem('bundleUsed') === 'true') return null;
+    if (!isOpen || !primaryProduct || bundledProducts.length === 0) return null;
     const hasTwoBundle = bundledProducts.length >= 2;
 
     const formatTime = (seconds) => {
@@ -70,9 +70,8 @@ const AutoBundlerModal = ({ isOpen, onClose, primaryProduct, primarySize }) => {
     const savings = originalTotal - bundlePrice;
 
     const handleAddBundle = () => {
-        addToCart(primaryProduct._id, primarySize || primaryProduct.sizes[0]);
         bundledProducts.forEach(p => {
-            addToCart(p._id, p.sizes[0]);
+            addToCart(p._id, p.sizes[0], false);
         });
         
         toast.success("🎉 Bundle items added to cart!");
@@ -197,13 +196,12 @@ const AutoBundlerModal = ({ isOpen, onClose, primaryProduct, primarySize }) => {
                         
                         <button 
                             onClick={() => {
-                                addToCart(primaryProduct._id, primarySize || primaryProduct.sizes[0]);
                                 onClose();
                                 toast.success("Item Added to Cart");
                             }}
                             className="w-full text-xs sm:text-sm font-bold text-gray-400 hover:text-gray-800 transition-colors py-2"
                         >
-                            No thanks, just add my single item
+                            No thanks, continue to cart
                         </button>
                     </div>
                 </div>
