@@ -70,7 +70,16 @@ const OrderSuccessModal = ({ isOpen, onClose, orderDetails }) => {
                         </div>
                     </div>
                 ) : (
-                    <div className="w-full animate-fade-in">
+                    <div className="w-full animate-fade-in relative">
+                        {/* Close button */}
+                        <button 
+                            onClick={onClose}
+                            className="absolute -top-2 -right-2 sm:-top-4 sm:-right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-black transition-all hover:scale-105 active:scale-95"
+                            title="Close"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+
                         {/* Success Checkmark Circle & Micro Animation */}
                         <div className="relative mb-6 text-center">
                             <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto ring-8 ring-emerald-50 text-emerald-600 shadow-inner">
