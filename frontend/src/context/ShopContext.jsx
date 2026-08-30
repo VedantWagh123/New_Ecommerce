@@ -19,6 +19,7 @@ const ShopContextProvider = (props) => {
     const [products, setProducts] = useState([]);
     const [token, setToken] = useState('')
     const [couponData, setCouponData] = useState({ code: '', discount: 0 });
+    const [hasAddress, setHasAddress] = useState(false);
     const navigate = useNavigate();
 
     const [nluSearchResult, setNluSearchResult] = useState(null);
@@ -132,11 +133,17 @@ const ShopContextProvider = (props) => {
         }
     }, [savedForLater]);
 
-    const addToCart = async (itemId, size, showToast = true) => {
+    const addToCart = async (itemId, size, showToast = true, ignoreAddressCheck = false) => {
 
         if (!size) {
             toast.error('Select Product Size');
-            return;
+            return false;
+        }
+
+        if (!hasAddress && !ignoreAddressCheck) {
+            toast.error('Please add your shipping address to add items to cart');
+            navigate('/profile', { state: { focusEdit: true, pendingCartItem: { itemId, size, showToast } } });
+            return false;
         }
 
         setCartItems((prevCartItems) => {
@@ -180,6 +187,7 @@ const ShopContextProvider = (props) => {
             }).catch(() => {}); // Fire and forget
         } catch (e) {}
 
+        return true;
     }
 
     const addToSavedForLater = (itemId, size) => {
@@ -197,10 +205,12 @@ const ShopContextProvider = (props) => {
         toast.info("Moved to Saved for Later");
     };
 
-    const moveToCartFromSaved = (itemId, size) => {
-        setSavedForLater(prev => prev.filter(item => !(item._id === itemId && item.size === size)));
-        addToCart(itemId, size);
-        toast.success("Moved back to Cart");
+    const moveToCartFromSaved = async (itemId, size) => {
+        const success = await addToCart(itemId, size, false);
+        if (success) {
+            setSavedForLater(prev => prev.filter(item => !(item._id === itemId && item.size === size)));
+            toast.success("Moved back to Cart");
+        }
     };
 
     const removeFromSavedForLater = (itemId, size) => {
@@ -468,6 +478,27 @@ const ShopContextProvider = (props) => {
         }
     };
 
+    const fetchUserAddressStatus = async (userToken) => {
+        if (!userToken) {
+            setHasAddress(false);
+            return;
+        }
+        try {
+            const response = await axios.get(backendUrl + '/api/user/profile', { headers: { Authorization: `Bearer ${userToken}` } });
+            if (response.data.success) {
+                const user = response.data.user;
+                const addressObj = user.addresses?.[0];
+                if (addressObj && addressObj.address) {
+                    setHasAddress(true);
+                } else {
+                    setHasAddress(false);
+                }
+            }
+        } catch (error) {
+            console.error("Fetch User Address Status Error:", error);
+        }
+    };
+
     useEffect(() => {
         if (!token) {
             const localToken = localStorage.getItem('token');
@@ -475,12 +506,15 @@ const ShopContextProvider = (props) => {
                 setToken(localToken);
                 getUserCart(localToken);
                 fetchSellerStatus(localToken);
+                fetchUserAddressStatus(localToken);
             } else {
                 setSellerStatus('none');
+                setHasAddress(false);
             }
         } else {
             getUserCart(token);
             fetchSellerStatus(token);
+            fetchUserAddressStatus(token);
         }
     }, [token])
 
@@ -629,7 +663,8 @@ const ShopContextProvider = (props) => {
         karmaScore, setKarmaScore,
         nluSearchResult, setNluSearchResult, isNluSearching, fetchNluSearch,
         socket, notifications, markAsRead, markAllAsRead,
-        hasUsedBundle, setHasUsedBundle
+        hasUsedBundle, setHasUsedBundle,
+        hasAddress, setHasAddress
     }
 
     return (

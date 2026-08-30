@@ -1,7 +1,7 @@
 import orderModel from '../models/orderModel.js';
 import userModel from '../models/userModel.js';
 import payoutModel from '../models/payoutModel.js';
-import { sendNotification, getIO } from '../config/socket.js';
+import { sendNotification, getIO, emitOrderUpdate } from '../config/socket.js';
 
 const getUniqueSellerIds = (order) => {
     if (!order.items) return [];
@@ -55,7 +55,7 @@ const acceptDelivery = async (req, res) => {
 
         await sendNotification('admin', null, 'Delivery Accepted', `Wishmaster ${req.deliveryPartner.name} accepted delivery for Order #${order._id.toString().slice(-8).toUpperCase()}`, order._id);
         
-        getIO().emit('order-updated');
+        emitOrderUpdate(order);
 
         res.json({ success: true, message: 'Order accepted for delivery!', order });
     } catch (error) {
@@ -103,7 +103,7 @@ const pickupOrder = async (req, res) => {
             await sendNotification('seller', sid, 'Order Picked Up', `Your items for Order #${order._id.toString().slice(-8).toUpperCase()} have been picked up by the Wishmaster.`, order._id);
         }
         
-        getIO().emit('order-updated');
+        emitOrderUpdate(order);
 
         res.json({ success: true, message: 'Order picked up successfully.', order });
     } catch (error) {
@@ -151,7 +151,7 @@ const updateDeliveryStatus = async (req, res) => {
             await sendNotification('user', order.userId, 'Out for Delivery', `Your Order #${order._id.toString().slice(-8).toUpperCase()} is out for delivery today!`, order._id);
         }
         
-        getIO().emit('order-updated');
+        emitOrderUpdate(order);
 
         res.json({ success: true, message: `Status updated to ${status}`, order });
     } catch (error) {
@@ -219,7 +219,7 @@ const deliverOrder = async (req, res) => {
             await sendNotification('seller', sid, 'Order Delivered', `Your items for Order #${order._id.toString().slice(-8).toUpperCase()} have been delivered to the customer.`, order._id);
         }
         
-        getIO().emit('order-updated');
+        emitOrderUpdate(order);
 
         res.json({ success: true, message: 'Order Delivered Successfully!', order });
     } catch (error) {
@@ -278,7 +278,7 @@ const collectCOD = async (req, res) => {
             await sendNotification('seller', sid, 'COD Collected', `COD payment has been collected for your items in Order #${order._id.toString().slice(-8).toUpperCase()}.`, order._id);
         }
         
-        getIO().emit('order-updated');
+        emitOrderUpdate(order);
 
         res.json({ success: true, message: 'COD Collected Successfully!', order });
     } catch (error) {

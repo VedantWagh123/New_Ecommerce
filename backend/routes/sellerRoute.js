@@ -2,6 +2,7 @@ import express from 'express';
 import upload from '../middleware/multer.js';
 import sellerAuth from '../middleware/sellerAuth.js';
 import authUser from '../middleware/auth.js';
+import { authLimiter } from '../config/rateLimiter.js';
 import {
     registerSeller,
     applyForSeller,
@@ -29,9 +30,9 @@ import {
 const sellerRouter = express.Router();
 
 // Public auth endpoints
-sellerRouter.post('/register', registerSeller);
+sellerRouter.post('/register', authLimiter, registerSeller);
 sellerRouter.post('/apply', authUser, applyForSeller);
-sellerRouter.post('/login', loginSeller);
+sellerRouter.post('/login', authLimiter, loginSeller);
 sellerRouter.get('/status', getSellerStatus);
 
 // Protected Seller endpoints (Requires approved seller auth)

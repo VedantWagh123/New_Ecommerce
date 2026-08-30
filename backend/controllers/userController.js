@@ -5,7 +5,7 @@ import userModel from "../models/userModel.js";
 import { v2 as cloudinary } from "cloudinary";
 import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
-import { getIO } from "../config/socket.js";
+import { getIO, emitWishmasterUpdate } from "../config/socket.js";
 
 
 const createToken = (id) => {
@@ -436,12 +436,14 @@ const getUserProfile = async (req, res) => {
 // Update user profile
 const updateUserProfile = async (req, res) => {
     try {
-        const { userId, firstName, lastName, phone, address, city, state, zipcode, country } = req.body;
+        console.log('Update Profile Body:', req.body);
+        const userId = req.userId || req.body.userId; // fallback to req.body.userId if not set
+        const { firstName, lastName, phone, houseNo, street, landmark, city, state, pincode, addressType, country } = req.body; 
         
         let updateData = {
             name: `${firstName} ${lastName}`.trim(),
             phone,
-            addresses: [{ address, city, state, zipcode, country }]
+            addresses: [{ name: `${firstName} ${lastName}`.trim(), phone, houseNo, street, landmark, city, state, pincode, addressType, country }]
         };
 
         const imageFile = req.file;
@@ -601,7 +603,7 @@ const toggleDeliveryOnline = async (req, res) => {
         user.isDeliveryOnline = isDeliveryOnline;
         await user.save();
         
-        getIO().emit('wishmaster-updated');
+        emitWishmasterUpdate(userId);
         
         res.json({ success: true, message: 'Status updated successfully' });
     } catch (error) {

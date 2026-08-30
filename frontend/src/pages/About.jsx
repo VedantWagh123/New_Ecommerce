@@ -22,7 +22,7 @@ const About = () => {
                 <img 
                     className='w-full object-cover rounded-2xl shadow-sm relative z-10 transform group-hover:-translate-y-2 transition-transform duration-700 ease-out' 
                     src={assets.about_img} 
-                    alt="About Veloura" 
+                    alt="About Forever" 
                 />
             </div>
             
@@ -31,10 +31,10 @@ const About = () => {
                     The Next Generation of Commerce
                 </h3>
                 <p className="leading-relaxed">
-                    Veloura was born out of a passion for timeless elegance and a desire to redefine the modern wardrobe. Our journey began with a simple vision: to merge premium fashion with cutting-edge artificial intelligence, creating a shopping experience that feels magical.
+                    Forever was born out of a passion for timeless elegance and a desire to redefine the modern wardrobe. Our journey began with a simple vision: to merge premium fashion with cutting-edge artificial intelligence, creating a shopping experience that feels magical.
                 </p>
                 <p className="leading-relaxed">
-                    We've evolved beyond a traditional store. Today, Veloura is an intelligent ecosystem. Whether you are using our <span className="font-bold text-gray-900">AI Visual Search</span> to find an outfit from a photo, or experiencing our immersive <span className="font-bold text-gray-900">Video Commerce Studio</span>, we bring the future of shopping directly to you.
+                    We've evolved beyond a traditional store. Today, Forever is an intelligent ecosystem. Whether you are using our <span className="font-bold text-gray-900">AI Visual Search</span> to find an outfit from a photo, or experiencing our immersive <span className="font-bold text-gray-900">Video Commerce Studio</span>, we bring the future of shopping directly to you.
                 </p>
                 <b className='text-gray-900 text-lg mt-2'>Our Mission</b>
                 <p className="leading-relaxed">

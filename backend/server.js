@@ -25,6 +25,7 @@ import settingsRouter from './routes/settingsRoute.js'
 import newsletterRouter from './routes/newsletterRoute.js'
 import deliveryRouter from './routes/deliveryRoute.js'
 import notificationRouter from './routes/notificationRoute.js'
+import { globalLimiter } from './config/rateLimiter.js'
 import { createServer } from 'http'
 import { initSocket } from './config/socket.js'
 
@@ -42,6 +43,9 @@ startCartRecoveryCron()
 // Initialize Socket.io
 initSocket(server);
 
+// Trust proxy for secure IP detection on platforms like Render/Vercel
+app.set('trust proxy', 1)
+
 // middlewares
 app.use(compression())
 app.use(express.json({ limit: '50mb' }))
@@ -49,6 +53,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }))
 app.use(cors())
 
 // api endpoints
+app.use('/api', globalLimiter)
 app.use('/api/user',userRouter)
 app.use('/api/product',productRouter)
 app.use('/api/cart',cartRouter)

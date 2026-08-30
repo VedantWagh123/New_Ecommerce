@@ -4,14 +4,15 @@ import adminAuth from '../middleware/adminAuth.js';
 import roleAuth from '../middleware/roleAuth.js';
 import authUser from '../middleware/auth.js';
 import upload from '../middleware/multer.js';
+import { authLimiter } from '../config/rateLimiter.js';
 
 const userRouter = express.Router();
 
-userRouter.post('/register', registerUser)
-userRouter.post('/login', loginUser)
-userRouter.post('/verify-otp', verifyOtp)
-userRouter.post('/resend-otp', resendOtp)
-userRouter.post('/admin', adminLogin)
+userRouter.post('/register', authLimiter, registerUser)
+userRouter.post('/login', authLimiter, loginUser)
+userRouter.post('/verify-otp', authLimiter, verifyOtp)
+userRouter.post('/resend-otp', authLimiter, resendOtp)
+userRouter.post('/admin', authLimiter, adminLogin)
 
 // Admin seller management
 userRouter.get('/sellers', adminAuth, getSellers)
@@ -38,8 +39,8 @@ userRouter.get('/profile', authUser, getUserProfile);
 userRouter.post('/update-profile', authUser, upload.single('avatar'), updateUserProfile);
 
 // Password Reset Routes
-userRouter.post('/forgot-password', forgotPassword);
-userRouter.post('/verify-reset-otp', verifyResetOtp);
-userRouter.post('/reset-password', resetPassword);
+userRouter.post('/forgot-password', authLimiter, forgotPassword);
+userRouter.post('/verify-reset-otp', authLimiter, verifyResetOtp);
+userRouter.post('/reset-password', authLimiter, resetPassword);
 
 export default userRouter;

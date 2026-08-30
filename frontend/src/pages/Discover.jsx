@@ -115,7 +115,7 @@ const Discover = () => {
             <div className="hidden sm:flex absolute left-0 top-0 bottom-0 w-[calc(50%-220px)] flex-col items-end justify-center pr-16 pointer-events-none z-10">
                 <div className="relative text-right group">
                     <h1 className="text-6xl lg:text-[5.5rem] font-black text-transparent bg-clip-text bg-gradient-to-br from-gray-900 via-gray-700 to-gray-500 tracking-tighter drop-shadow-sm leading-none">
-                        VELOURA
+                        Forever
                         <br />
                         <span className="italic font-serif text-5xl lg:text-[4.5rem] font-light bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent animate-gradient-x">
                             Studio

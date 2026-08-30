@@ -2,7 +2,7 @@ import { v2 as cloudinary } from "cloudinary"
 import productModel from "../models/productModel.js"
 import productEventModel from "../models/productEventModel.js"
 import userModel from "../models/userModel.js"
-import { getIO } from "../config/socket.js"
+import { getIO, emitProductUpdate } from "../config/socket.js"
 import { getRedisClient, isRedisAvailable, clearProductCache } from "../config/redis.js"
 
 // Helper to populate storeName on products
@@ -85,7 +85,7 @@ const addProduct = async (req, res) => {
             }).catch(() => {});
         }
         
-        getIO().emit('product-updated');
+        emitProductUpdate(product);
         await clearProductCache();
 
         res.json({ success: true, message: "Product Added" })
@@ -133,9 +133,11 @@ const listProducts = async (req, res) => {
 const removeProduct = async (req, res) => {
     try {
         
-        await productModel.findByIdAndDelete(req.body.id)
+        const product = await productModel.findByIdAndDelete(req.body.id)
         
-        getIO().emit('product-updated');
+        if (product) {
+            emitProductUpdate(product);
+        }
         await clearProductCache();
         
         res.json({success:true,message:"Product Removed"})
@@ -209,7 +211,7 @@ const approveProduct = async (req, res) => {
             return res.json({ success: false, message: "Product not found" });
         }
         
-        getIO().emit('product-updated');
+        emitProductUpdate(product);
         await clearProductCache();
         
         res.json({ success: true, message: `Product "${product.name}" approved!`, product });
@@ -232,7 +234,7 @@ const rejectProduct = async (req, res) => {
             return res.json({ success: false, message: "Product not found" });
         }
         
-        getIO().emit('product-updated');
+        emitProductUpdate(product);
         await clearProductCache();
         
         res.json({ success: true, message: `Product "${product.name}" rejected.`, product });

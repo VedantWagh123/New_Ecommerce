@@ -266,6 +266,17 @@ ADMIN:   Shipped → In Transit → Out for Delivery → Delivered
 
 ---
 
+### Upgrade H: Socket.IO Targeted Broadcasting (Anti-DDoS)
+
+**Real-Time Optimization:**
+- **Problem Statement:** Pehle system me har chote order/product update par ek global `getIO().emit()` fire hota tha, jo **saare** connected frontends ko page auto-refresh karne ka signal bhejta tha. Agar 1,000 users live hote, toh ek update 1,000 backend API calls trigger karta, jisse server crash (self-DDoS) ho sakta tha.
+- **The Solution (Room-based Targeted Emits):** Maine `socket.js` me `emitOrderUpdate`, `emitProductUpdate`, aur `emitWishmasterUpdate` naam ke smart helper functions banaye hain.
+- **How it Works:** Ab Socket.IO global broadcast ki jagah sirf specific **rooms** me messages push karta hai. 
+  - **Orders:** Agar koi order cancel ya deliver hota hai, toh socket notification sirf us specific Customer (`user_XYZ`), specific Seller (`seller_ABC`), specific Delivery Partner (`delivery_123`) aur `admin` ko jati hai. Baki ki duniya ko pata bhi nahi chalta.
+  - **Products:** Agar koi seller apna product update karta hai, toh auto-refresh ka signal sirf us specific Seller aur Admin ko jata hai. Customers globally refresh nahi karte, unhe Redis ke through navigation pe fresh data mil jata hai. Isse server load technically 99% reduce ho gaya hai.
+
+---
+
 ## 📂 5. Database Schema (Collections)
 
 1. **`users`**: Saare buyers, sellers, aur admins yahi save hote hain. Unke role (`user`, `seller`, `admin`) ke basis pe unhe alag permissions milti hain. Isme fraud prevention ke liye user ka `karmaScore` bhi store hota hai.

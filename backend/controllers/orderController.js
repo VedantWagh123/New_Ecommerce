@@ -5,7 +5,7 @@ import Stripe from 'stripe'
 import razorpay from 'razorpay'
 import settingsModel from "../models/settingsModel.js";
 import couponModel from "../models/couponModel.js";
-import { sendNotification, getIO } from "../config/socket.js";
+import { sendNotification, getIO, emitOrderUpdate } from "../config/socket.js";
 
 // Helper function to notify admin and sellers when an order is placed
 const notifyOrderPlaced = async (orderId) => {
@@ -177,7 +177,7 @@ const placeOrder = async (req,res) => {
         await markCouponAsUsed(couponCode, userId);
 
         await userModel.findByIdAndUpdate(userId,{cartData:{}})
-        getIO().emit('order-updated');
+        emitOrderUpdate(newOrder);
         await notifyOrderPlaced(newOrder._id);
 
         res.json({success:true,message:"Order Placed", orderId: newOrder._id})
@@ -300,7 +300,7 @@ const verifyStripe = async (req,res) => {
         if (success === "true") {
             await orderModel.findByIdAndUpdate(orderId, {payment:true});
             await userModel.findByIdAndUpdate(userId, {cartData: {}})
-            getIO().emit('order-updated');
+            emitOrderUpdate(newOrder);
             await notifyOrderPlaced(orderId);
             
             res.json({success: true});
@@ -438,7 +438,7 @@ const verifyRazorpay = async (req,res) => {
         if (orderInfo.status === 'paid') {
             await orderModel.findByIdAndUpdate(orderInfo.receipt,{payment:true});
             await userModel.findByIdAndUpdate(userId,{cartData:{}})
-            getIO().emit('order-updated');
+            emitOrderUpdate(newOrder);
             await notifyOrderPlaced(orderInfo.receipt);
             
             res.json({ success: true, message: "Payment Successful" })
@@ -569,7 +569,7 @@ const updateStatus = async (req,res) => {
             }
         }
         
-        getIO().emit('order-updated');
+        emitOrderUpdate(existingOrder);
 
         res.json({success:true, message:'Status Updated', orderId, status})
 
@@ -842,7 +842,7 @@ const approveCancellation = async (req, res) => {
             }
         }
         
-        getIO().emit('order-updated');
+        emitOrderUpdate(order);
 
         res.json({ success: true, message: 'Cancellation approved.' });
     } catch (error) {
@@ -905,7 +905,7 @@ const assignWishmaster = async (req, res) => {
         // Notification to Delivery Partner
         await sendNotification('delivery', partnerId, 'New Delivery Assigned', `You have been assigned to deliver Order #${order._id.toString().slice(-8).toUpperCase()}`, order._id);
         
-        getIO().emit('order-updated');
+        emitOrderUpdate(order);
 
         res.json({ success: true, message: 'Wishmaster assigned successfully', order });
     } catch (error) {

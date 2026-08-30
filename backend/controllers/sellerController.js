@@ -8,7 +8,7 @@ import orderModel from "../models/orderModel.js";
 import reviewModel from "../models/reviewModel.js";
 import payoutModel from "../models/payoutModel.js";
 import settingsModel from "../models/settingsModel.js";
-import { sendNotification, getIO } from "../config/socket.js";
+import { sendNotification, getIO, emitProductUpdate, emitOrderUpdate } from "../config/socket.js";
 import { clearProductCache } from "../config/redis.js";
 
 const createToken = (id) => {
@@ -487,7 +487,7 @@ const addSellerProduct = async (req, res) => {
             }).catch(() => {});
         }
 
-        getIO().emit('product-updated');
+        emitProductUpdate({ sellerId: req.sellerId });
         await clearProductCache();
 
         res.json({ success: true, message: "Product submitted successfully! Pending admin approval." });
@@ -531,7 +531,7 @@ const editSellerProduct = async (req, res) => {
 
         await productModel.findByIdAndUpdate(id, updateData);
 
-        getIO().emit('product-updated');
+        emitProductUpdate({ sellerId: req.sellerId });
         await clearProductCache();
 
         res.json({ success: true, message: "Product updated & resubmitted for admin approval." });
@@ -550,7 +550,7 @@ const deleteSellerProduct = async (req, res) => {
             return res.json({ success: false, message: "Product not found or unauthorized" });
         }
         
-        getIO().emit('product-updated');
+        emitProductUpdate({ sellerId: req.sellerId });
         await clearProductCache();
 
         res.json({ success: true, message: "Product deleted successfully" });
@@ -645,7 +645,7 @@ const updateSellerOrderStatus = async (req, res) => {
         // Send notification to Admin for ALL status updates
         await sendNotification('admin', null, `Order ${status}`, `Order #${order._id.toString().slice(-8).toUpperCase()} status updated to ${status} by seller ${sellerStore}.`, order._id);
 
-        getIO().emit('order-updated');
+        emitOrderUpdate(order);
 
         res.json({ success: true, message: `Order status updated to ${status}` });
 
@@ -698,7 +698,7 @@ const updateStock = async (req, res) => {
         product.stock = stock;
         await product.save();
         
-        getIO().emit('product-updated');
+        emitProductUpdate(product);
         await clearProductCache();
 
         res.json({ success: true, message: "Stock updated successfully", stock: product.stock });

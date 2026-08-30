@@ -41,7 +41,7 @@ const App = () => {
   }, [token, role])
 
   return (
-    <div className='bg-slate-50 h-screen overflow-hidden text-slate-900 selection:bg-indigo-500 selection:text-white flex flex-col'>
+    <div className='bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-50 via-white to-fuchsia-50 h-screen overflow-hidden text-slate-900 selection:bg-indigo-500 selection:text-white flex flex-col font-sans antialiased'>
       <ToastContainer position="top-right" autoClose={3000} />
       {token === ""
         ? <Login setToken={setToken} setRole={setRole} />
@@ -57,7 +57,7 @@ const App = () => {
             <Sidebar role={role} />
 
             {/* Main content area scrolls independently */}
-            <main className='flex-1 h-full overflow-y-auto overflow-x-hidden bg-slate-50 custom-scrollbar'>
+            <main className='flex-1 h-full overflow-y-auto overflow-x-hidden bg-transparent custom-scrollbar'>
               <div className='max-w-[1400px] mx-auto px-4 sm:px-8 py-6 w-full'>
                 <Routes>
                   <Route path='/' element={<Dashboard token={token} />} />

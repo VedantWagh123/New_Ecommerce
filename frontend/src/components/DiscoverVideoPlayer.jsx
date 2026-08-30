@@ -138,7 +138,7 @@ const DiscoverVideoPlayer = ({ video, isActive, onVideoEnd }) => {
                     >
                         <img src={video.productId.image[0]} alt={video.productId.name} className="w-16 h-16 rounded-lg object-cover" />
                         <div className="flex-1">
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">{video.productId.storeName || 'Veloura Official'}</p>
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">{video.productId.storeName || 'Forever Official'}</p>
                             <h3 className="text-sm font-black text-gray-900 line-clamp-1">{video.productId.name}</h3>
                             <p className="text-sm font-black text-emerald-600">{currency}{video.productId.price}</p>
                         </div>

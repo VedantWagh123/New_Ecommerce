@@ -1,4 +1,5 @@
 import React, { useContext, useState, useEffect, useRef } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import Title from '../components/Title'
 import { ShopContext } from '../context/ShopContext'
 import axios from 'axios'
@@ -6,18 +7,24 @@ import { toast } from 'react-toastify'
 import { Camera, Mail, Phone, MapPin, User, ArrowRight, ShieldCheck, Clock, XCircle, Store, Truck } from 'lucide-react'
 
 const Profile = () => {
-    const { token, sellerStatus, backendUrl, fetchSellerStatus } = useContext(ShopContext);
+    const { token, sellerStatus, backendUrl, fetchSellerStatus, setHasAddress, addToCart } = useContext(ShopContext);
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [highlightEdit, setHighlightEdit] = useState(false);
 
     const [formData, setFormData] = useState({
         firstName: '',
         lastName: '',
         email: '',
         phone: '',
-        address: '',
+        houseNo: '',
+        street: '',
+        landmark: '',
         city: '',
         state: '',
-        zipcode: '',
-        country: ''
+        pincode: '',
+        country: 'India',
+        addressType: 'Home'
     });
 
     const [isEditing, setIsEditing] = useState(false);
@@ -68,11 +75,14 @@ const Profile = () => {
                     lastName: lName,
                     email: user.email || '',
                     phone: user.phone || '',
-                    address: addressObj.address || '',
+                    houseNo: addressObj.houseNo || '',
+                    street: addressObj.street || '',
+                    landmark: addressObj.landmark || '',
                     city: addressObj.city || '',
                     state: addressObj.state || '',
-                    zipcode: addressObj.zipcode || '',
-                    country: addressObj.country || '',
+                    pincode: addressObj.pincode || '',
+                    country: addressObj.country || 'India',
+                    addressType: addressObj.addressType || 'Home',
                 });
                 setAvatarPreview(user.avatar || '');
                 setOriginalAvatar(user.avatar || '');
@@ -99,6 +109,20 @@ const Profile = () => {
         fetchUserProfile();
     }, [token, backendUrl]);
 
+    useEffect(() => {
+        if (location.state?.focusEdit) {
+            setIsEditing(true);
+            setHighlightEdit(true);
+            
+            setTimeout(() => {
+                window.scrollTo({ top: 300, behavior: 'smooth' });
+                setTimeout(() => setHighlightEdit(false), 2000);
+            }, 500);
+            
+            window.history.replaceState({}, document.title)
+        }
+    }, [location]);
+
     const onChangeHandler = (e) => {
         const name = e.target.name;
         const value = e.target.value;
@@ -122,15 +146,30 @@ const Profile = () => {
     const onSubmitHandler = async (e) => {
         e.preventDefault();
         setLoading(true);
+
+        if (!/^[0-9]{10}$/.test(formData.phone.replace(/\D/g, ''))) {
+            toast.error('Please enter a valid 10-digit mobile number');
+            setLoading(false);
+            return;
+        }
+        if (!/^[0-9]{6}$/.test(formData.pincode)) {
+            toast.error('Please enter a valid 6-digit pincode');
+            setLoading(false);
+            return;
+        }
+
         try {
             const submitData = new FormData();
             submitData.append('firstName', formData.firstName);
             submitData.append('lastName', formData.lastName);
             submitData.append('phone', formData.phone);
-            submitData.append('address', formData.address);
+            submitData.append('houseNo', formData.houseNo);
+            submitData.append('street', formData.street);
+            submitData.append('landmark', formData.landmark);
             submitData.append('city', formData.city);
             submitData.append('state', formData.state);
-            submitData.append('zipcode', formData.zipcode);
+            submitData.append('pincode', formData.pincode);
+            submitData.append('addressType', formData.addressType);
             submitData.append('country', formData.country);
             if (avatarFile) {
                 submitData.append('avatar', avatarFile);
@@ -140,6 +179,19 @@ const Profile = () => {
             if (response.data.success) {
                 toast.success('Profile updated successfully!');
                 setIsEditing(false);
+                if (formData.houseNo && formData.street && formData.pincode) {
+                    setHasAddress?.(true);
+                    // Automatic cart addition if we were redirected from Product page
+                    if (location.state?.pendingCartItem) {
+                        const { itemId, size } = location.state.pendingCartItem;
+                        await addToCart(itemId, size, true, true);
+                        
+                        // Clear the location state so it doesn't run again
+                        navigate('/cart', { replace: true });
+                    }
+                } else {
+                    setHasAddress?.(false);
+                }
                 fetchUserProfile();
             } else {
                 toast.error(response.data.message);
@@ -434,23 +486,23 @@ const Profile = () => {
                 </div>
 
                 {/* Profile Form Section (Glassmorphism) */}
-                <div className='flex-1 bg-white/60 backdrop-blur-xl border border-white rounded-3xl p-6 sm:p-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative'>
+                <div className={`flex-1 bg-white/60 backdrop-blur-xl border ${highlightEdit ? 'border-indigo-500 shadow-[0_0_30px_rgba(99,102,241,0.6)] animate-pulse' : 'border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]'} rounded-2xl p-5 sm:p-7 relative transition-all duration-700`}>
                     
-                    <form onSubmit={onSubmitHandler} className='flex flex-col gap-8 relative z-10'>
+                    <form onSubmit={onSubmitHandler} className='flex flex-col gap-6 relative z-10'>
                         
                         {/* Personal Info */}
                         <div>
-                            <h3 className='text-sm font-bold tracking-widest text-indigo-900 mb-5 flex items-center gap-2 uppercase'>
+                            <h3 className='text-xs font-bold tracking-widest text-indigo-900 mb-4 flex items-center gap-2 uppercase'>
                                 <User className="w-4 h-4" /> Personal Details
                             </h3>
-                            <div className='grid grid-cols-1 sm:grid-cols-2 gap-5'>
+                            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
                                 <div>
                                     <label className='text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 block'>First Name</label>
                                     <input 
                                         name='firstName'
                                         onChange={onChangeHandler}
                                         value={formData.firstName}
-                                        className={`w-full px-4 py-3 rounded-xl border outline-none transition-all text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
+                                        className={`w-full px-3 py-2.5 rounded-lg border outline-none transition-all text-xs sm:text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
                                         type="text" 
                                         readOnly={!isEditing}
                                         required
@@ -462,7 +514,7 @@ const Profile = () => {
                                         name='lastName'
                                         onChange={onChangeHandler}
                                         value={formData.lastName}
-                                        className={`w-full px-4 py-3 rounded-xl border outline-none transition-all text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
+                                        className={`w-full px-3 py-2.5 rounded-lg border outline-none transition-all text-xs sm:text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
                                         type="text" 
                                         readOnly={!isEditing}
                                     />
@@ -472,7 +524,7 @@ const Profile = () => {
                                     <input 
                                         name='email'
                                         value={formData.email}
-                                        className="w-full px-4 py-3 rounded-xl border border-transparent bg-gray-100/50 text-gray-500 text-sm font-medium outline-none cursor-not-allowed" 
+                                        className="w-full px-3 py-2.5 rounded-lg border border-transparent bg-gray-100/50 text-gray-500 text-xs sm:text-sm font-medium outline-none cursor-not-allowed" 
                                         type="email" 
                                         readOnly
                                         disabled
@@ -485,7 +537,7 @@ const Profile = () => {
                                         name='phone'
                                         onChange={onChangeHandler}
                                         value={formData.phone}
-                                        className={`w-full px-4 py-3 rounded-xl border outline-none transition-all text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
+                                        className={`w-full px-3 py-2.5 rounded-lg border outline-none transition-all text-xs sm:text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
                                         type="tel" 
                                         readOnly={!isEditing}
                                         placeholder="+1 234 567 890"
@@ -496,69 +548,117 @@ const Profile = () => {
 
                         <hr className="border-gray-200/60" />
 
-                        {/* Shipping Address */}
+                        {/* Shipping Address (Flipkart Style) */}
                         <div>
-                            <h3 className='text-sm font-bold tracking-widest text-indigo-900 mb-5 flex items-center gap-2 uppercase'>
+                            <h3 className='text-xs font-bold tracking-widest text-indigo-900 mb-4 flex items-center gap-2 uppercase'>
                                 <MapPin className="w-4 h-4" /> Shipping Address
                             </h3>
-                            <div className='flex flex-col gap-5'>
+                            <div className='flex flex-col gap-4'>
+                                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                                    <div>
+                                        <label className='text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 block'>Pincode <span className="text-red-500">*</span></label>
+                                        <input 
+                                            name='pincode'
+                                            onChange={onChangeHandler}
+                                            value={formData.pincode}
+                                            className={`w-full px-3 py-2.5 rounded-lg border outline-none transition-all text-xs sm:text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
+                                            type="text" 
+                                            readOnly={!isEditing}
+                                            required
+                                            maxLength={6}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className='text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 block'>Locality / Area <span className="text-red-500">*</span></label>
+                                        <input 
+                                            name='street'
+                                            onChange={onChangeHandler}
+                                            value={formData.street}
+                                            className={`w-full px-3 py-2.5 rounded-lg border outline-none transition-all text-xs sm:text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
+                                            type="text" 
+                                            readOnly={!isEditing}
+                                            required
+                                        />
+                                    </div>
+                                </div>
                                 <div>
-                                    <label className='text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 block'>Street Address</label>
+                                    <label className='text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 block'>House No., Building, Flat <span className="text-red-500">*</span></label>
                                     <input 
-                                        name='address'
+                                        name='houseNo'
                                         onChange={onChangeHandler}
-                                        value={formData.address}
-                                        className={`w-full px-4 py-3 rounded-xl border outline-none transition-all text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
+                                        value={formData.houseNo}
+                                        className={`w-full px-3 py-2.5 rounded-lg border outline-none transition-all text-xs sm:text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
+                                        type="text" 
+                                        readOnly={!isEditing}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className='text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 block'>Landmark (Optional)</label>
+                                    <input 
+                                        name='landmark'
+                                        onChange={onChangeHandler}
+                                        value={formData.landmark}
+                                        className={`w-full px-3 py-2.5 rounded-lg border outline-none transition-all text-xs sm:text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
                                         type="text" 
                                         readOnly={!isEditing}
                                     />
                                 </div>
-                                <div className='grid grid-cols-2 gap-5'>
+                                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
                                     <div>
-                                        <label className='text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 block'>City</label>
+                                        <label className='text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 block'>City / District <span className="text-red-500">*</span></label>
                                         <input 
                                             name='city'
                                             onChange={onChangeHandler}
                                             value={formData.city}
-                                            className={`w-full px-4 py-3 rounded-xl border outline-none transition-all text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
+                                            className={`w-full px-3 py-2.5 rounded-lg border outline-none transition-all text-xs sm:text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
                                             type="text" 
                                             readOnly={!isEditing}
+                                            required
                                         />
                                     </div>
                                     <div>
-                                        <label className='text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 block'>State</label>
+                                        <label className='text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 block'>State <span className="text-red-500">*</span></label>
                                         <input 
                                             name='state'
                                             onChange={onChangeHandler}
                                             value={formData.state}
-                                            className={`w-full px-4 py-3 rounded-xl border outline-none transition-all text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
+                                            className={`w-full px-3 py-2.5 rounded-lg border outline-none transition-all text-xs sm:text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
                                             type="text" 
                                             readOnly={!isEditing}
+                                            required
                                         />
                                     </div>
                                 </div>
-                                <div className='grid grid-cols-2 gap-5'>
-                                    <div>
-                                        <label className='text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 block'>Zip Code</label>
-                                        <input 
-                                            name='zipcode'
-                                            onChange={onChangeHandler}
-                                            value={formData.zipcode}
-                                            className={`w-full px-4 py-3 rounded-xl border outline-none transition-all text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
-                                            type="text" 
-                                            readOnly={!isEditing}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className='text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 block'>Country</label>
-                                        <input 
-                                            name='country'
-                                            onChange={onChangeHandler}
-                                            value={formData.country}
-                                            className={`w-full px-4 py-3 rounded-xl border outline-none transition-all text-sm font-medium ${isEditing ? 'border-indigo-200 bg-white shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100' : 'border-transparent bg-gray-100/50 text-gray-600'}`} 
-                                            type="text" 
-                                            readOnly={!isEditing}
-                                        />
+                                
+                                {/* Address Type Selection */}
+                                <div>
+                                    <label className='text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 block'>Address Type</label>
+                                    <div className="flex gap-3">
+                                        <label className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all cursor-pointer ${formData.addressType === 'Home' ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'} ${!isEditing && 'pointer-events-none'}`}>
+                                            <input 
+                                                type="radio" 
+                                                name="addressType" 
+                                                value="Home" 
+                                                checked={formData.addressType === 'Home'}
+                                                onChange={onChangeHandler}
+                                                className="hidden"
+                                                disabled={!isEditing}
+                                            />
+                                            <span className="text-xs">🏠 Home</span>
+                                        </label>
+                                        <label className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all cursor-pointer ${formData.addressType === 'Work' ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'} ${!isEditing && 'pointer-events-none'}`}>
+                                            <input 
+                                                type="radio" 
+                                                name="addressType" 
+                                                value="Work" 
+                                                checked={formData.addressType === 'Work'}
+                                                onChange={onChangeHandler}
+                                                className="hidden"
+                                                disabled={!isEditing}
+                                            />
+                                            <span className="text-xs">🏢 Work</span>
+                                        </label>
                                     </div>
                                 </div>
                             </div>
@@ -566,11 +666,11 @@ const Profile = () => {
 
                         {/* Save Button */}
                         {isEditing && (
-                            <div className='flex justify-end mt-4'>
+                            <div className='flex justify-end mt-2'>
                                 <button 
                                     type='submit' 
                                     disabled={loading}
-                                    className='bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-10 py-3.5 rounded-xl text-sm font-bold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-indigo-500/30 hover:-translate-y-0.5 flex items-center justify-center gap-2 min-w-[200px]'
+                                    className='bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-3 rounded-xl text-xs sm:text-sm font-bold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-indigo-500/30 hover:-translate-y-0.5 flex items-center justify-center gap-2 min-w-[160px]'
                                 >
                                     {loading ? (
                                         <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>

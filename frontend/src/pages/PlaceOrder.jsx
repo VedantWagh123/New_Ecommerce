@@ -35,38 +35,49 @@ const PlaceOrder = () => {
         }
     }, [karmaScore, method]);
 
-    // Initial Address State (Loads from localStorage if saved previously)
-    const [formData, setFormData] = useState(() => {
-        try {
-            const savedAddr = localStorage.getItem('user_shipping_address');
-            return savedAddr ? JSON.parse(savedAddr) : {
-                firstName: '',
-                lastName: '',
-                email: '',
-                street: '',
-                city: '',
-                state: '',
-                zipcode: '',
-                country: '',
-                phone: ''
-            };
-        } catch (e) {
-            return {
-                firstName: '', lastName: '', email: '', street: '', city: '', state: '', zipcode: '', country: '', phone: ''
-            };
-        }
+    // Initial Address State
+    const [formData, setFormData] = useState({
+        firstName: '', lastName: '', email: '', phone: '', houseNo: '', street: '', landmark: '', city: '', state: '', pincode: '', country: 'India', addressType: 'Home'
     });
+
+    useEffect(() => {
+        const loadAddress = async () => {
+            if (token) {
+                try {
+                    const response = await axios.get(backendUrl + '/api/user/profile', { headers: { Authorization: `Bearer ${token}` } });
+                    if (response.data.success) {
+                        const user = response.data.user;
+                        const addr = user.addresses?.[0];
+                        if (addr) {
+                            const nameParts = (user.name || '').split(' ');
+                            setFormData({
+                                firstName: nameParts[0] || '',
+                                lastName: nameParts.slice(1).join(' ') || '',
+                                email: user.email || '',
+                                phone: user.phone || '',
+                                houseNo: addr.houseNo || '',
+                                street: addr.street || '',
+                                landmark: addr.landmark || '',
+                                city: addr.city || '',
+                                state: addr.state || '',
+                                pincode: addr.pincode || '',
+                                country: addr.country || 'India',
+                                addressType: addr.addressType || 'Home'
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch address", error);
+                }
+            }
+        };
+        loadAddress();
+    }, [token, backendUrl]);
 
     const onChangeHandler = (event) => {
         const name = event.target.name;
         const value = event.target.value;
-        setFormData(data => {
-            const updated = { ...data, [name]: value };
-            try {
-                localStorage.setItem('user_shipping_address', JSON.stringify(updated));
-            } catch (e) {}
-            return updated;
-        });
+        setFormData(data => ({ ...data, [name]: value }));
     };
 
     // Calculate cart items list for checkout review
@@ -147,12 +158,21 @@ const PlaceOrder = () => {
         }
 
         // Validate required fields
-        const requiredFields = ['firstName', 'lastName', 'email', 'street', 'city', 'zipcode', 'country', 'phone'];
+        const requiredFields = ['firstName', 'phone', 'houseNo', 'street', 'city', 'state', 'pincode'];
         for (const field of requiredFields) {
             if (!formData[field] || formData[field].trim() === '') {
-                toast.error(`Please complete all required fields (${field})`);
+                toast.error(`Please complete all required fields`);
                 return;
             }
+        }
+        
+        if (!/^[0-9]{10}$/.test(formData.phone.replace(/\D/g, ''))) {
+            toast.error('Please enter a valid 10-digit mobile number');
+            return;
+        }
+        if (!/^[0-9]{6}$/.test(formData.pincode)) {
+            toast.error('Please enter a valid 6-digit pincode');
+            return;
         }
 
         setIsSubmitting(true);
@@ -294,34 +314,74 @@ const PlaceOrder = () => {
                             placeholder="First name *"
                         />
                         <input
-                            required
                             onChange={onChangeHandler}
                             name="lastName"
                             value={formData.lastName}
                             className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                             type="text"
-                            placeholder="Last name *"
+                            placeholder="Last name"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input
+                            required
+                            onChange={onChangeHandler}
+                            name="phone"
+                            value={formData.phone}
+                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                            type="tel"
+                            placeholder="Mobile Number *"
+                        />
+                        <input
+                            onChange={onChangeHandler}
+                            name="email"
+                            value={formData.email}
+                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all bg-gray-50 text-gray-500"
+                            type="email"
+                            placeholder="Email address"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input
+                            required
+                            onChange={onChangeHandler}
+                            name="pincode"
+                            value={formData.pincode}
+                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                            type="text"
+                            maxLength={6}
+                            placeholder="Pincode *"
+                        />
+                        <input
+                            required
+                            onChange={onChangeHandler}
+                            name="street"
+                            value={formData.street}
+                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                            type="text"
+                            placeholder="Locality / Area *"
                         />
                     </div>
 
                     <input
                         required
                         onChange={onChangeHandler}
-                        name="email"
-                        value={formData.email}
+                        name="houseNo"
+                        value={formData.houseNo}
                         className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                        type="email"
-                        placeholder="Email address *"
+                        type="text"
+                        placeholder="House No., Building, Flat *"
                     />
 
                     <input
-                        required
                         onChange={onChangeHandler}
-                        name="street"
-                        value={formData.street}
+                        name="landmark"
+                        value={formData.landmark}
                         className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                         type="text"
-                        placeholder="Street / Flat / Landmark *"
+                        placeholder="Landmark (Optional)"
                     />
 
                     <div className="grid grid-cols-2 gap-3">
@@ -332,48 +392,46 @@ const PlaceOrder = () => {
                             value={formData.city}
                             className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                             type="text"
-                            placeholder="City *"
+                            placeholder="City / District *"
                         />
                         <input
+                            required
                             onChange={onChangeHandler}
                             name="state"
                             value={formData.state}
                             className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                             type="text"
-                            placeholder="State"
+                            placeholder="State *"
                         />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <input
-                            required
-                            onChange={onChangeHandler}
-                            name="zipcode"
-                            value={formData.zipcode}
-                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                            type="number"
-                            placeholder="Zipcode / Pincode *"
-                        />
-                        <input
-                            required
-                            onChange={onChangeHandler}
-                            name="country"
-                            value={formData.country}
-                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                            type="text"
-                            placeholder="Country *"
-                        />
+                    
+                    <div>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Address Type</p>
+                        <div className="flex gap-3">
+                            <label className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all cursor-pointer ${formData.addressType === 'Home' ? 'border-black bg-black text-white font-bold shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}>
+                                <input 
+                                    type="radio" 
+                                    name="addressType" 
+                                    value="Home" 
+                                    checked={formData.addressType === 'Home'}
+                                    onChange={onChangeHandler}
+                                    className="hidden"
+                                />
+                                <span className="text-xs">🏠 Home</span>
+                            </label>
+                            <label className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all cursor-pointer ${formData.addressType === 'Work' ? 'border-black bg-black text-white font-bold shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}>
+                                <input 
+                                    type="radio" 
+                                    name="addressType" 
+                                    value="Work" 
+                                    checked={formData.addressType === 'Work'}
+                                    onChange={onChangeHandler}
+                                    className="hidden"
+                                />
+                                <span className="text-xs">🏢 Work</span>
+                            </label>
+                        </div>
                     </div>
-
-                    <input
-                        required
-                        onChange={onChangeHandler}
-                        name="phone"
-                        value={formData.phone}
-                        className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                        type="tel"
-                        placeholder="Phone number *"
-                    />
 
                     {/* Order Item Quick Summary Preview */}
                     <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-100">

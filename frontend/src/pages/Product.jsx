@@ -169,8 +169,8 @@ const Product = () => {
 
   const handleShare = async () => {
     const shareData = {
-      title: productData?.name || 'Veloura Product',
-      text: `Check out this amazing product on Veloura!`,
+      title: productData?.name || 'Forever Product',
+      text: `Check out this amazing product on Forever!`,
       url: window.location.href,
     };
     try {
@@ -252,7 +252,7 @@ const Product = () => {
           <div className="flex items-center gap-2 mt-1.5">
             <span className="text-xs font-medium text-gray-500">Sold by:</span>
             <span className="px-2.5 py-0.5 text-xs font-bold bg-gray-100 text-gray-800 rounded-full border border-gray-200 flex items-center gap-1">
-              <span>🏪</span> {productData.storeName || 'Veloura Official'}
+              <span>🏪</span> {productData.storeName || 'Forever Official'}
             </span>
           </div>
 
@@ -515,20 +515,27 @@ const Product = () => {
           ) : (
             <div className='flex flex-col sm:flex-row gap-3 items-stretch'>
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (!size) {
                     addToCart(productData._id, size); // will show toast error
                     return;
                   }
-                  addToCart(productData._id, size, false);
-                  setIsBundlerOpen(true);
+                  const success = await addToCart(productData._id, size, false);
+                  if (success) {
+                    setIsBundlerOpen(true);
+                  }
                 }}
                 className='flex-1 bg-[#ff9f00] hover:bg-amber-600 text-white py-4 rounded-xl text-xs font-bold active:scale-98 transition-all uppercase shadow-md'
               >
                 ADD TO CART
               </button>
               <button
-                onClick={() => { addToCart(productData._id, size); navigate('/cart'); }}
+                onClick={async () => { 
+                  const success = await addToCart(productData._id, size); 
+                  if (success) {
+                    navigate('/cart'); 
+                  }
+                }}
                 className='flex-1 bg-[#fb641b] hover:bg-orange-600 text-white py-4 rounded-xl text-xs font-bold active:scale-98 transition-all uppercase shadow-md'
               >
                 BUY NOW
@@ -593,7 +600,7 @@ const Product = () => {
                 <h4 className="font-bold text-xs text-gray-900 uppercase tracking-wider mb-3">Product Overview</h4>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <span className="text-gray-500 font-medium">Seller / Store:</span>
-                  <span className="font-bold text-gray-900">{productData.storeName || 'Veloura Official'}</span>
+                  <span className="font-bold text-gray-900">{productData.storeName || 'Forever Official'}</span>
                   
                   <span className="text-gray-500 font-medium">Brand:</span>
                   <span className="font-bold text-gray-900">{productData.brand || 'Forever Fashion'}</span>

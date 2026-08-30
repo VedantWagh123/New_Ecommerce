@@ -172,7 +172,7 @@ const Membership = () => {
                         <div className="space-y-1">
                             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500 text-black text-xs font-black uppercase tracking-wider shadow-sm">
                                 <Crown className="w-4 h-4 fill-black" />
-                                <span>VELOURA VIP GOLD MEMBER</span>
+                                <span>Forever VIP GOLD MEMBER</span>
                             </div>
                             <h1 className="text-2xl sm:text-4xl font-black text-gray-900">
                                 Welcome to Your VIP Portal
@@ -273,7 +273,7 @@ const Membership = () => {
                 <section className="text-center space-y-5 max-w-2xl mx-auto pt-4">
                     <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-bold border border-amber-200">
                         <Crown className="w-4 h-4 text-amber-600" />
-                        <span>VELOURA PREMIUM</span>
+                        <span>Forever PREMIUM</span>
                     </div>
 
                     <h1 className="text-3xl sm:text-5xl font-black text-gray-900 tracking-tight">
@@ -320,7 +320,7 @@ const Membership = () => {
                         <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <Crown className="w-5 h-5 text-amber-400 fill-amber-400" />
-                                <h3 className="font-bold text-sm tracking-wide">VELOURA VIP Membership Checkout</h3>
+                                <h3 className="font-bold text-sm tracking-wide">Forever VIP Membership Checkout</h3>
                             </div>
                             <button 
                                 onClick={() => setShowPaymentModal(false)}

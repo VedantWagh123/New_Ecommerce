@@ -90,3 +90,52 @@ export const sendNotification = async (role, userId, title, message, orderId = n
         console.error("Error sending notification:", error);
     }
 };
+
+// Targeted Event Emitters to replace global broadcasts
+export const emitOrderUpdate = (order) => {
+    if (!io) return;
+    
+    // Always notify admins
+    io.to('admin').emit('order-updated');
+
+    if (!order) return;
+
+    // Notify the customer
+    if (order.userId) {
+        io.to(`user_${order.userId}`).emit('order-updated');
+    }
+
+    // Notify the delivery partner
+    if (order.deliveryPartnerId) {
+        io.to(`delivery_${order.deliveryPartnerId}`).emit('order-updated');
+    }
+
+    // Notify involved sellers
+    if (order.items && Array.isArray(order.items)) {
+        const sellerIds = [...new Set(order.items.map(item => item.sellerId).filter(Boolean))];
+        sellerIds.forEach(sellerId => {
+            io.to(`seller_${sellerId}`).emit('order-updated');
+        });
+    }
+};
+
+export const emitProductUpdate = (product = null) => {
+    if (!io) return;
+    
+    // Always notify admins
+    io.to('admin').emit('product-updated');
+
+    // Notify the specific seller if known, otherwise we don't broadcast to avoid overload.
+    if (product && product.sellerId) {
+        io.to(`seller_${product.sellerId}`).emit('product-updated');
+    }
+};
+
+export const emitWishmasterUpdate = (userId) => {
+    if (!io) return;
+    
+    io.to('admin').emit('wishmaster-updated');
+    if (userId) {
+        io.to(`user_${userId}`).emit('wishmaster-updated');
+    }
+};
