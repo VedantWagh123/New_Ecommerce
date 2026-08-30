@@ -46,7 +46,31 @@ const OrderDetailsModal = ({ isOpen, onClose, order, currency = '$', onRefresh }
 
     // For visualization, map Packing to Order Placed
     const displayStatus = status === ORDER_STATUS.PACKING ? 'Order Placed' : status;
-    const currentStepIndex = customerSteps.indexOf(displayStatus);
+    
+    // Compute logical step index to handle intermediate statuses properly
+    const getLogicalStepIndex = (currentStatus) => {
+        switch (currentStatus) {
+            case 'Order Placed':
+            case ORDER_STATUS.PACKING: return 0;
+            case ORDER_STATUS.ACCEPTED: return 1;
+            case ORDER_STATUS.PACKED: return 2;
+            case ORDER_STATUS.READY_TO_SHIP:
+            case 'Ready for Pickup':
+            case 'Assigned':
+            case 'Accepted (Delivery)':
+                return 3;
+            case ORDER_STATUS.SHIPPED:
+            case ORDER_STATUS.HANDED_TO_LOGISTICS:
+            case 'Picked Up':
+                return 4;
+            case ORDER_STATUS.IN_TRANSIT: return 5;
+            case ORDER_STATUS.OUT_FOR_DELIVERY: return 6;
+            case ORDER_STATUS.DELIVERED: return 7;
+            default: return -1;
+        }
+    };
+    const currentStepIndex = getLogicalStepIndex(displayStatus);
+
     const isCancelled = status === ORDER_STATUS.CANCELLED || status === ORDER_STATUS.DELIVERY_FAILED;
 
     const getHistoryTimestamp = (stepStatus) => {
