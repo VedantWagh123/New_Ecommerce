@@ -488,7 +488,7 @@ const ShopContextProvider = (props) => {
             if (response.data.success) {
                 const user = response.data.user;
                 const addressObj = user.addresses?.[0];
-                if (addressObj && addressObj.address) {
+                if (addressObj && (addressObj.street || addressObj.zipcode || addressObj.city)) {
                     setHasAddress(true);
                 } else {
                     setHasAddress(false);
