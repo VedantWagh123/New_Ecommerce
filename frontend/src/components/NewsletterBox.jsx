@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useContext } from 'react'
+import { ShopContext } from '../context/ShopContext'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 
@@ -9,15 +10,25 @@ const NewsletterBox = () => {
     const [isSubscribed, setIsSubscribed] = useState(false);
 
     const backendUrl = import.meta.env.VITE_BACKEND_URL;
+    const { token } = useContext(ShopContext);
 
     const onSubmitHandler = async (event) => {
         event.preventDefault();
+        
+        if (!token) {
+            toast.error("Please login to subscribe to the newsletter offer.");
+            return;
+        }
         
         if (!email) return;
 
         setLoading(true);
         try {
-            const response = await axios.post(`${backendUrl}/api/newsletter/subscribe`, { email });
+            const response = await axios.post(
+                `${backendUrl}/api/newsletter/subscribe`, 
+                { email },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
             
             if (response.data.success) {
                 setIsSubscribed(true);

@@ -1,13 +1,25 @@
 import newsletterModel from "../models/newsletterModel.js";
 import couponModel from "../models/couponModel.js";
+import userModel from "../models/userModel.js";
 import sendEmail from "../utils/sendEmail.js";
 
 const subscribeNewsletter = async (req, res) => {
     try {
-        const { email } = req.body;
+        const { email, userId } = req.body;
         
         if (!email || !email.includes('@')) {
             return res.json({ success: false, message: "Invalid email format" });
+        }
+
+        // Fetch logged in user
+        const user = await userModel.findById(userId);
+        if (!user) {
+            return res.json({ success: false, message: "User not found. Please log in." });
+        }
+
+        // Enforce that the provided email matches the registered email
+        if (user.email.toLowerCase() !== email.toLowerCase()) {
+            return res.json({ success: false, message: `Offer restricted to your registered email (${user.email}).` });
         }
 
         const existingSubscriber = await newsletterModel.findOne({ email: email.toLowerCase() });
