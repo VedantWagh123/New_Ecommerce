@@ -251,6 +251,21 @@ ADMIN:   Shipped → In Transit → Out for Delivery → Delivered
 
 ---
 
+### Upgrade G: Redis Caching (High-Performance Read APIs)
+
+**Performance Optimization:**
+- **Redis Integration:** Integrated Redis (`redis` npm package) to cache heavy read operations, specifically the `listProducts` and `singleProduct` APIs. 
+- **Graceful Degradation:** Backend configuration (`redis.js`) includes a strong fail-safe mechanism. If the Redis server is unavailable, the application silently falls back to MongoDB without crashing, ensuring zero downtime.
+- **Selective Caching:** Caching is strictly limited to non-sensitive public product data. Authentication, Carts, Orders, and Finances remain 100% real-time directly on MongoDB.
+
+**The Check-and-Set Workflow (How it works):**
+1. **Superfast Loading:** Jab koi customer website open karta hai, Node.js server pehle Redis (In-Memory RAM) se products mangta hai. Ye MongoDB query ke comparison me 10x fast hota hai.
+2. **MongoDB Bypass (Cache Hit):** Agar Redis me data already save hai, toh server directly wahi data return kar deta hai, MongoDB par koi load nahi padta.
+3. **Auto-Save (Cache Miss):** Agar pehli baar koi aata hai aur Redis khali hai, toh server MongoDB se data nikalta hai, customer ko bhejta hai, aur ek copy background me Redis me 1 ghante (`setEx` command) ke liye save kar deta hai.
+4. **Instant Update (Cache Invalidation):** Agar koi Admin product approve/reject karta hai, ya koi Seller apna product edit/delete ya stock update karta hai, toh backend turant Redis se purana data delete (`del` command) kar deta hai. Isse users ko hamesha fresh live data hi milta hai.
+
+---
+
 ## 📂 5. Database Schema (Collections)
 
 1. **`users`**: Saare buyers, sellers, aur admins yahi save hote hain. Unke role (`user`, `seller`, `admin`) ke basis pe unhe alag permissions milti hain. Isme fraud prevention ke liye user ka `karmaScore` bhi store hota hai.

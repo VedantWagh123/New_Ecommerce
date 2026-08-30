@@ -3,6 +3,7 @@ import productModel from "../models/productModel.js"
 import productEventModel from "../models/productEventModel.js"
 import userModel from "../models/userModel.js"
 import { getIO } from "../config/socket.js"
+import { getRedisClient, isRedisAvailable, clearProductCache } from "../config/redis.js"
 
 // Helper to populate storeName on products
 const enrichProductsWithStoreName = async (products) => {
@@ -85,6 +86,7 @@ const addProduct = async (req, res) => {
         }
         
         getIO().emit('product-updated');
+        await clearProductCache();
 
         res.json({ success: true, message: "Product Added" })
 
@@ -97,6 +99,14 @@ const addProduct = async (req, res) => {
 // function for list product (Permanent persistence for approved & legacy store products)
 const listProducts = async (req, res) => {
     try {
+        const cacheKey = 'cache:products:list';
+        if (isRedisAvailable()) {
+            const cachedData = await getRedisClient().get(cacheKey);
+            if (cachedData) {
+                return res.json({ success: true, products: JSON.parse(cachedData) });
+            }
+        }
+
         const dbProducts = await productModel.find({
             $or: [
                 { approvalStatus: 'approved' },
@@ -105,6 +115,12 @@ const listProducts = async (req, res) => {
             ]
         });
         const products = await enrichProductsWithStoreName(dbProducts);
+
+        if (isRedisAvailable()) {
+            // Cache for 1 hour
+            await getRedisClient().setEx(cacheKey, 3600, JSON.stringify(products));
+        }
+
         res.json({success:true,products})
 
     } catch (error) {
@@ -120,6 +136,7 @@ const removeProduct = async (req, res) => {
         await productModel.findByIdAndDelete(req.body.id)
         
         getIO().emit('product-updated');
+        await clearProductCache();
         
         res.json({success:true,message:"Product Removed"})
 
@@ -134,11 +151,25 @@ const singleProduct = async (req, res) => {
     try {
         
         const { productId } = req.body
+
+        const cacheKey = `cache:products:single:${productId}`;
+        if (isRedisAvailable()) {
+            const cachedData = await getRedisClient().get(cacheKey);
+            if (cachedData) {
+                return res.json({ success: true, product: JSON.parse(cachedData) });
+            }
+        }
+
         const dbProduct = await productModel.findById(productId)
         if (!dbProduct) {
             return res.json({ success: false, message: "Product not found" });
         }
         const [product] = await enrichProductsWithStoreName([dbProduct]);
+
+        if (isRedisAvailable()) {
+            await getRedisClient().setEx(cacheKey, 3600, JSON.stringify(product));
+        }
+
         res.json({success:true,product})
 
     } catch (error) {
@@ -179,6 +210,7 @@ const approveProduct = async (req, res) => {
         }
         
         getIO().emit('product-updated');
+        await clearProductCache();
         
         res.json({ success: true, message: `Product "${product.name}" approved!`, product });
     } catch (error) {
@@ -201,6 +233,7 @@ const rejectProduct = async (req, res) => {
         }
         
         getIO().emit('product-updated');
+        await clearProductCache();
         
         res.json({ success: true, message: `Product "${product.name}" rejected.`, product });
     } catch (error) {

@@ -4,6 +4,7 @@ import compression from 'compression'
 import 'dotenv/config'
 import connectDB from './config/mongodb.js'
 import connectCloudinary from './config/cloudinary.js'
+import { initRedis } from './config/redis.js'
 import startCartRecoveryCron from './cron/cartRecovery.js'
 import userRouter from './routes/userRoute.js'
 import productRouter from './routes/productRoute.js'
@@ -33,6 +34,7 @@ const server = createServer(app)
 const port = process.env.PORT || 4000
 connectDB()
 connectCloudinary()
+initRedis()
 
 // Start Background Services
 startCartRecoveryCron()

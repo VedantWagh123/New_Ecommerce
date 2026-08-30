@@ -9,6 +9,7 @@ import reviewModel from "../models/reviewModel.js";
 import payoutModel from "../models/payoutModel.js";
 import settingsModel from "../models/settingsModel.js";
 import { sendNotification, getIO } from "../config/socket.js";
+import { clearProductCache } from "../config/redis.js";
 
 const createToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET);
@@ -486,6 +487,9 @@ const addSellerProduct = async (req, res) => {
             }).catch(() => {});
         }
 
+        getIO().emit('product-updated');
+        await clearProductCache();
+
         res.json({ success: true, message: "Product submitted successfully! Pending admin approval." });
 
     } catch (error) {
@@ -527,6 +531,9 @@ const editSellerProduct = async (req, res) => {
 
         await productModel.findByIdAndUpdate(id, updateData);
 
+        getIO().emit('product-updated');
+        await clearProductCache();
+
         res.json({ success: true, message: "Product updated & resubmitted for admin approval." });
 
     } catch (error) {
@@ -542,6 +549,10 @@ const deleteSellerProduct = async (req, res) => {
         if (!deleted) {
             return res.json({ success: false, message: "Product not found or unauthorized" });
         }
+        
+        getIO().emit('product-updated');
+        await clearProductCache();
+
         res.json({ success: true, message: "Product deleted successfully" });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -686,6 +697,9 @@ const updateStock = async (req, res) => {
 
         product.stock = stock;
         await product.save();
+        
+        getIO().emit('product-updated');
+        await clearProductCache();
 
         res.json({ success: true, message: "Stock updated successfully", stock: product.stock });
     } catch (error) {
