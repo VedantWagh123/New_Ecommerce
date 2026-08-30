@@ -35,8 +35,11 @@ const ScrollToTop = () => {
 };
 
 const App = () => {
+  const { pathname } = useLocation();
+  const isPremiumMode = pathname === '/membership';
+
   return (
-    <div className='px-2 sm:px-[5vw] md:px-[7vw] lg:px-[9vw] min-h-screen flex flex-col justify-between relative'>
+    <div className={`px-2 sm:px-[5vw] md:px-[7vw] lg:px-[9vw] min-h-screen flex flex-col justify-between relative transition-colors duration-700 ease-in-out ${isPremiumMode ? 'bg-zinc-950 text-white' : 'bg-white text-gray-900'}`}>
       <ScrollToTop />
       <div>
         <ToastContainer />

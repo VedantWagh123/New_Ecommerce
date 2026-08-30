@@ -1,6 +1,6 @@
 import React, { useContext, useState, useRef, useEffect } from 'react'
 import {assets} from '../assets/assets'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { ShopContext } from '../context/ShopContext';
 import VisualSearchModal from './VisualSearchModal';
 import NotificationBell from './NotificationBell';
@@ -12,6 +12,8 @@ const Navbar = () => {
     const [showVisualSearch, setShowVisualSearch] = useState(false);
     const profileRef = useRef(null);
     const timeoutRef = useRef(null);
+    const { pathname } = useLocation();
+    const isPremium = pathname === '/membership';
 
     const {setShowSearch, getCartCount, navigate, token, setToken, setCartItems, wishlist, sellerStatus, vipStatus, setCouponData} = useContext(ShopContext);
 
@@ -70,35 +72,35 @@ const Navbar = () => {
     }, []);
 
   return (
-    <div className='flex items-center justify-between py-5 font-medium sticky top-0 z-50 bg-white shadow-sm -mx-2 sm:-mx-[5vw] md:-mx-[7vw] lg:-mx-[9vw] px-2 sm:px-[5vw] md:px-[7vw] lg:px-[9vw]'>
+    <div className={`flex items-center justify-between py-5 font-medium sticky top-0 z-50 transition-colors duration-700 ease-in-out -mx-2 sm:-mx-[5vw] md:-mx-[7vw] lg:-mx-[9vw] px-2 sm:px-[5vw] md:px-[7vw] lg:px-[9vw] ${isPremium ? 'bg-zinc-950 shadow-none border-b border-white/10' : 'bg-white shadow-sm'}`}>
       
       <Link to='/' className='flex items-center gap-2'>
-          <img src={assets.logo} className='w-28 sm:w-36 object-contain' alt="Store Logo" />
+          <img src={assets.logo} className={`w-28 sm:w-36 object-contain transition-all duration-700 ${isPremium ? 'brightness-0 invert opacity-90' : ''}`} alt="Store Logo" />
       </Link>
 
-      <ul className='hidden sm:flex gap-5 text-sm text-gray-700'>
+      <ul className={`hidden sm:flex gap-5 text-sm transition-colors duration-700 ${isPremium ? 'text-zinc-300' : 'text-gray-700'}`}>
         
-        <NavLink to='/' className='flex flex-col items-center gap-1'>
-            <p>HOME</p>
-            <hr className='w-2/4 border-none h-[1.5px] bg-gray-700 hidden' />
+        <NavLink to='/' className={({isActive}) => `flex flex-col items-center gap-1 ${isActive ? (isPremium ? 'text-yellow-400' : 'text-black') : ''}`}>
+            <p className="hover:text-yellow-500 transition-colors">HOME</p>
+            <hr className={`w-2/4 border-none h-[1.5px] bg-current hidden ${isPremium ? '' : ''}`} />
         </NavLink>
-        <NavLink to='/collection' className='flex flex-col items-center gap-1'>
-            <p>COLLECTION</p>
-            <hr className='w-2/4 border-none h-[1.5px] bg-gray-700 hidden' />
+        <NavLink to='/collection' className={({isActive}) => `flex flex-col items-center gap-1 ${isActive ? (isPremium ? 'text-yellow-400' : 'text-black') : ''}`}>
+            <p className="hover:text-yellow-500 transition-colors">COLLECTION</p>
+            <hr className='w-2/4 border-none h-[1.5px] bg-current hidden' />
         </NavLink>
-        <NavLink to='/discover' className='flex flex-col items-center gap-1 group relative'>
-            <p className="bg-clip-text font-bold flex items-center gap-1">
+        <NavLink to='/discover' className={({isActive}) => `flex flex-col items-center gap-1 group relative ${isActive ? (isPremium ? 'text-yellow-400' : 'text-black') : ''}`}>
+            <p className="bg-clip-text font-bold flex items-center gap-1 hover:text-yellow-500 transition-colors">
               <span>✨</span> STUDIO
             </p>
-            <hr className='w-2/4 border-none h-[1.5px] bg-gray-700 hidden' />
+            <hr className='w-2/4 border-none h-[1.5px] bg-current hidden' />
         </NavLink>
-        <NavLink to='/about' className='flex flex-col items-center gap-1'>
-            <p>ABOUT</p>
-            <hr className='w-2/4 border-none h-[1.5px] bg-gray-700 hidden' />
+        <NavLink to='/about' className={({isActive}) => `flex flex-col items-center gap-1 ${isActive ? (isPremium ? 'text-yellow-400' : 'text-black') : ''}`}>
+            <p className="hover:text-yellow-500 transition-colors">ABOUT</p>
+            <hr className='w-2/4 border-none h-[1.5px] bg-current hidden' />
         </NavLink>
-        <NavLink to='/contact' className='flex flex-col items-center gap-1'>
-            <p>CONTACT</p>
-            <hr className='w-2/4 border-none h-[1.5px] bg-gray-700 hidden' />
+        <NavLink to='/contact' className={({isActive}) => `flex flex-col items-center gap-1 ${isActive ? (isPremium ? 'text-yellow-400' : 'text-black') : ''}`}>
+            <p className="hover:text-yellow-500 transition-colors">CONTACT</p>
+            <hr className='w-2/4 border-none h-[1.5px] bg-current hidden' />
         </NavLink>
         <NavLink to='/membership' className='flex flex-col items-center gap-1 group relative'>
             <p className="bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-600 text-transparent bg-clip-text font-bold flex items-center gap-1">
@@ -115,17 +117,17 @@ const Navbar = () => {
       </ul>
 
       <div className='flex items-center gap-4 sm:gap-6'>
-            <img onClick={()=> { setShowSearch(true); navigate('/collection') }} src={assets.search_icon} className='w-5 cursor-pointer' title="Text Search" alt="Search" />
+            <img onClick={()=> { setShowSearch(true); navigate('/collection') }} src={assets.search_icon} className={`w-5 cursor-pointer transition-all duration-700 ${isPremium ? 'brightness-0 invert opacity-80 hover:opacity-100' : ''}`} title="Text Search" alt="Search" />
 
             <button 
                 onClick={() => setShowVisualSearch(true)} 
-                className='text-gray-700 hover:text-black transition-colors cursor-pointer text-base leading-none p-1 rounded-full hover:bg-gray-100'
+                className={`transition-colors cursor-pointer text-base leading-none p-1 rounded-full ${isPremium ? 'text-zinc-300 hover:text-white hover:bg-zinc-800' : 'text-gray-700 hover:text-black hover:bg-gray-100'}`}
                 title="Visual / Camera Search"
             >
                 📷
             </button>
             
-            <Link to='/wishlist' className='relative text-gray-700 hover:text-rose-600 transition-colors' title="My Wishlist">
+            <Link to='/wishlist' className={`relative transition-colors ${isPremium ? 'text-zinc-300 hover:text-rose-400' : 'text-gray-700 hover:text-rose-600'}`} title="My Wishlist">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
@@ -144,7 +146,7 @@ const Navbar = () => {
             >
                 <img 
                     onClick={handleProfileClick} 
-                    className='w-5 cursor-pointer hover:opacity-80 transition-opacity' 
+                    className={`w-5 cursor-pointer transition-all duration-700 ${isPremium ? 'brightness-0 invert opacity-80 hover:opacity-100' : 'hover:opacity-80'}`} 
                     src={assets.profile_icon} 
                     alt="Profile" 
                 />
@@ -212,11 +214,11 @@ const Navbar = () => {
                 )}
             </div>  
             <NotificationBell />
-            <Link to='/cart' className='relative'>
-                <img src={assets.cart_icon} className='w-5 min-w-5' alt="" />
-                <p className='absolute right-[-5px] bottom-[-5px] w-4 text-center leading-4 bg-black text-white aspect-square rounded-full text-[8px]'>{getCartCount()}</p>
+            <Link to='/cart' className='relative group'>
+                <img src={assets.cart_icon} className={`w-5 min-w-5 transition-all duration-700 ${isPremium ? 'brightness-0 invert opacity-80 group-hover:opacity-100' : ''}`} alt="" />
+                <p className={`absolute right-[-5px] bottom-[-5px] w-4 text-center leading-4 text-white aspect-square rounded-full text-[8px] transition-colors duration-700 ${isPremium ? 'bg-yellow-500 text-black font-bold' : 'bg-black'}`}>{getCartCount()}</p>
             </Link> 
-            <img onClick={()=>setVisible(true)} src={assets.menu_icon} className='w-5 cursor-pointer sm:hidden' alt="" /> 
+            <img onClick={()=>setVisible(true)} src={assets.menu_icon} className={`w-5 cursor-pointer sm:hidden transition-all duration-700 ${isPremium ? 'brightness-0 invert opacity-90' : ''}`} alt="" /> 
       </div>
 
         {/* Sidebar menu for small screens */}
