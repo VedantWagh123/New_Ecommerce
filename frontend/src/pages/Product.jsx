@@ -279,7 +279,7 @@ const Product = () => {
             <p className='text-emerald-600 font-bold text-sm bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200'>(25% OFF)</p>
           </div>
 
-          <p className='mt-3 text-gray-500 text-sm leading-relaxed'>{productData.description}</p>
+          <p className='mt-4 text-gray-700 text-sm sm:text-base leading-[1.8] font-medium'>{productData.description}</p>
 
           {/* Multiple Bank Offers Section */}
           {bankOffers.length > 0 && (
@@ -656,9 +656,9 @@ const Product = () => {
             </div>
 
             {/* Description Details */}
-            <div className="p-4 bg-white rounded-xl border border-gray-200/80 space-y-2">
-              <h4 className="font-bold text-xs text-gray-900 uppercase tracking-wider">Complete Description</h4>
-              <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">{productData.description}</p>
+            <div className="p-5 bg-white rounded-xl border border-gray-200/80 space-y-3 shadow-xs">
+              <h4 className="font-bold text-sm text-gray-900 uppercase tracking-wider">Complete Description</h4>
+              <p className="text-sm sm:text-base text-gray-700 leading-[1.8] font-medium">{productData.description}</p>
             </div>
           </div>
         )}
