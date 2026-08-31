@@ -10,34 +10,10 @@ import payoutModel from "../models/payoutModel.js";
 import settingsModel from "../models/settingsModel.js";
 import { sendNotification, getIO, emitProductUpdate, emitOrderUpdate } from "../config/socket.js";
 import { clearProductCache } from "../config/redis.js";
+import { calculateSellerShare } from "../utils/financeUtils.js";
 
 const createToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET);
-};
-
-const calculateSellerShare = (order, sellerId, commissionRate) => {
-    const sellerItems = order.items.filter(i => i.sellerId === sellerId);
-    if (sellerItems.length === 0) return { itemTotal: 0, sellerShare: 0, sellerItems };
-    
-    const itemTotal = sellerItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-    
-    let totalDiscount = 0;
-    if (order.subtotal && order.amount) {
-        totalDiscount = Math.max(0, order.subtotal - (order.amount - (order.tax || 0) - (order.platformFee || 0) - (order.deliveryFee || 0)));
-    } else {
-        totalDiscount = order.couponDiscount || 0;
-    }
-
-    let proratedDiscount = 0;
-    if (order.subtotal && order.subtotal > 0) {
-        proratedDiscount = totalDiscount * (itemTotal / order.subtotal);
-    }
-
-    const sellerDiscountBurden = proratedDiscount * 0.5;
-    const baseRevenue = Math.max(0, itemTotal - sellerDiscountBurden);
-    const sellerShare = baseRevenue * (1 - commissionRate);
-
-    return { itemTotal, sellerShare, sellerItems };
 };
 
 // 1. Seller Registration

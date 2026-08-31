@@ -6,6 +6,7 @@ import razorpay from 'razorpay'
 import settingsModel from "../models/settingsModel.js";
 import couponModel from "../models/couponModel.js";
 import { sendNotification, getIO, emitOrderUpdate } from "../config/socket.js";
+import { calculateSellerShare } from "../utils/financeUtils.js";
 
 // Helper function to notify admin and sellers when an order is placed
 const notifyOrderPlaced = async (orderId) => {
@@ -385,19 +386,24 @@ const placeOrderRazorpay = async (req,res) => {
         // Build Transfers array
         const transfers = [];
         
-        enrichedItems.forEach(item => {
-            if (item.sellerId && item.sellerId !== 'admin' && item.razorpayAccountId) {
-                const itemTotal = item.price * item.quantity;
-                const sellerShare = Math.round((itemTotal - (itemTotal * commissionRate)) * 100); // in paise
+        const uniqueSellers = [...new Set(enrichedItems.map(i => i.sellerId).filter(id => id && id !== 'admin'))];
+        
+        uniqueSellers.forEach(sellerId => {
+            const sellerItems = enrichedItems.filter(i => i.sellerId === sellerId);
+            const razorpayAccountId = sellerItems.find(i => i.razorpayAccountId)?.razorpayAccountId;
+            
+            if (razorpayAccountId) {
+                const { sellerShare } = calculateSellerShare({ ...orderData, items: enrichedItems }, sellerId, commissionRate);
+                const sellerSharePaise = Math.round(sellerShare * 100); // in paise
                 
-                if (sellerShare > 0) {
+                if (sellerSharePaise > 0) {
                     transfers.push({
-                        account: item.razorpayAccountId,
-                        amount: sellerShare,
+                        account: razorpayAccountId,
+                        amount: sellerSharePaise,
                         currency: currency.toUpperCase(),
                         notes: {
                             orderId: newOrder._id.toString(),
-                            productName: item.name
+                            productName: sellerItems.map(i => i.name).join(', ').substring(0, 40)
                         },
                         linked_account_notes: ["orderId"]
                     });

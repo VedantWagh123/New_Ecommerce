@@ -2,6 +2,7 @@ import orderModel from '../models/orderModel.js';
 import payoutModel from '../models/payoutModel.js';
 import userModel from '../models/userModel.js';
 import settingsModel from '../models/settingsModel.js';
+import { calculateSellerShare } from '../utils/financeUtils.js';
 
 export const getPlatformFinances = async (req, res) => {
     try {
@@ -15,27 +16,31 @@ export const getPlatformFinances = async (req, res) => {
         let automatedPaid = 0; // Tracks amounts paid automatically via Razorpay Route
 
         deliveredOrders.forEach(order => {
-            order.items.forEach(item => {
-                const itemTotal = item.price * item.quantity;
-                grossSales += itemTotal;
-
-                if (item.sellerId && item.sellerId !== 'admin' && item.sellerId !== null) {
-                    const commission = itemTotal * commissionRate;
-                    const sellerShare = itemTotal - commission;
-                    
-                    platformCommission += commission;
-                    sellerEarnings += sellerShare;
-                    
-                    // If it was a Razorpay prepaid order and the seller had a linked account, it was auto-paid
-                    if (order.paymentMethod === 'Razorpay' && order.payment && item.razorpayAccountId) {
-                        automatedPaid += sellerShare;
-                    }
-                    
-                } else {
-                    // Admin's own product or default products
-                    platformCommission += itemTotal;
+            const uniqueSellers = [...new Set(order.items.map(i => i.sellerId).filter(id => id && id !== 'admin'))];
+            
+            uniqueSellers.forEach(sellerId => {
+                const { sellerShare, platformCommission: comm } = calculateSellerShare(order, sellerId, commissionRate);
+                
+                platformCommission += comm;
+                sellerEarnings += sellerShare;
+                
+                // Track Razorpay auto-transfers
+                const sellerItems = order.items.filter(i => i.sellerId === sellerId);
+                const hasRazorpayAccount = sellerItems.some(i => i.razorpayAccountId);
+                if (order.paymentMethod === 'Razorpay' && order.payment && hasRazorpayAccount) {
+                    automatedPaid += sellerShare;
                 }
+                
+                // Track gross sales for these items
+                const itemTotal = sellerItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+                grossSales += itemTotal;
             });
+
+            // Admin's own products
+            const adminItems = order.items.filter(i => !i.sellerId || i.sellerId === 'admin');
+            const adminTotal = adminItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+            platformCommission += adminTotal;
+            grossSales += adminTotal;
         });
 
         const allPayouts = await payoutModel.find({}).sort({ date: -1 });

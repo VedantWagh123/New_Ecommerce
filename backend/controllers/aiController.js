@@ -22,7 +22,7 @@ import {
   resolveProductFromContext
 } from '../services/aiTools.js';
 
-const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
+const OLLAMA_HOST = process.env.OLLAMA_API_URL || process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llava:latest';
 const OLLAMA_VISION_MODEL = process.env.OLLAMA_VISION_MODEL || 'llava:latest';
 
@@ -207,11 +207,11 @@ INSTRUCTIONS:
         stream: false
       }, 120000); // 120s timeout for complex tool decision
     } catch (llmErr) {
-      console.warn("LLM API Error during tool resolution:", llmErr.message);
+      console.warn("LLM API Error (Ollama Offline):", llmErr.message);
       return res.json({
         success: true,
         intent: 'FALLBACK',
-        reply: `I'm having a bit of trouble connecting to my AI core. (Error: ${llmErr.message}). Could you please ask that again?`,
+        reply: `AI Stylist is currently sleeping. Please try normal search!`,
         recommendedProducts: [],
       });
     }
