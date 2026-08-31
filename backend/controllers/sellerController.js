@@ -233,7 +233,10 @@ const getDashboardOverview = async (req, res) => {
         
         // Data for Analytics Charts
         const statusDistribution = {
+            'Placed': 0,
             'Packing': 0,
+            'Ready to Ship': 0,
+            'Handed to Logistics': 0,
             'Shipped': 0,
             'Out for Delivery': 0,
             'Delivered': 0,
@@ -264,14 +267,20 @@ const getDashboardOverview = async (req, res) => {
                     statusDistribution[order.status] += 1;
                 }
 
-                // Populate sales trend
+                // Populate sales trend (last 7 days only)
                 if (order.status === 'Delivered') {
                     const dateObj = new Date(order.date);
-                    const dateStr = dateObj.toLocaleDateString('default', { month: 'short', day: 'numeric' });
-                    if (!salesByDate[dateStr]) {
-                        salesByDate[dateStr] = 0;
+                    const now = new Date();
+                    const diffTime = Math.abs(now - dateObj);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    if (diffDays <= 7) {
+                        const dateStr = dateObj.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+                        if (!salesByDate[dateStr]) {
+                            salesByDate[dateStr] = 0;
+                        }
+                        salesByDate[dateStr] += itemTotal;
                     }
-                    salesByDate[dateStr] += itemTotal;
                 }
 
                 // Populate Top Products & Category Data

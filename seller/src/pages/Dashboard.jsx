@@ -94,16 +94,8 @@ const Dashboard = ({ token, searchQuery }) => {
     }));
   };
 
-  // Orders Overview Line Chart Data (This week vs Last week)
-  const overviewData = [
-    { name: '18 May', thisWeek: 180, lastWeek: 90 },
-    { name: '19 May', thisWeek: 250, lastWeek: 140 },
-    { name: '20 May', thisWeek: 240, lastWeek: 220 },
-    { name: '21 May', thisWeek: 230, lastWeek: 130 },
-    { name: '22 May', thisWeek: 300, lastWeek: 200 },
-    { name: '23 May', thisWeek: 210, lastWeek: 130 },
-    { name: '24 May', thisWeek: 320, lastWeek: 280 },
-  ];
+  // The backend now provides real sales trend in `charts.salesTrend`.
+  // We will use that instead of overviewData.
 
   // Order Status Donut Chart
   const statusColors = {
@@ -113,14 +105,27 @@ const Dashboard = ({ token, searchQuery }) => {
     'Pending': '#f59e0b'    // Orange
   };
 
-  const statusData = [
-    { name: 'Delivered', value: charts.statusDistribution?.['Delivered'] || 685, color: statusColors['Delivered'], percent: '54.9%' },
-    { name: 'Shipped', value: charts.statusDistribution?.['Shipped'] || 276, color: statusColors['Shipped'], percent: '22.1%' },
-    { name: 'Processing', value: charts.statusDistribution?.['Packing'] || 178, color: statusColors['Processing'], percent: '14.3%' },
-    { name: 'Pending', value: charts.statusDistribution?.['Placed'] || 109, color: statusColors['Pending'], percent: '8.7%' },
-  ];
+  const rawStatusDistribution = charts.statusDistribution || {};
+  const totalStatusCount = Object.values(rawStatusDistribution).reduce((acc, val) => acc + val, 0);
 
-  const totalStatus = statusData.reduce((acc, curr) => acc + curr.value, 0);
+  const getPercent = (val) => {
+    if (totalStatusCount === 0) return '0%';
+    return ((val / totalStatusCount) * 100).toFixed(1) + '%';
+  };
+
+  const statusData = [
+    { name: 'Delivered', value: rawStatusDistribution['Delivered'] || 0, color: statusColors['Delivered'], percent: getPercent(rawStatusDistribution['Delivered'] || 0) },
+    { name: 'Shipped', value: rawStatusDistribution['Shipped'] || 0, color: statusColors['Shipped'], percent: getPercent(rawStatusDistribution['Shipped'] || 0) },
+    { name: 'Processing', value: rawStatusDistribution['Packing'] || 0, color: statusColors['Processing'], percent: getPercent(rawStatusDistribution['Packing'] || 0) },
+    { name: 'Pending', value: rawStatusDistribution['Placed'] || 0, color: statusColors['Pending'], percent: getPercent(rawStatusDistribution['Placed'] || 0) },
+  ].filter(item => item.value > 0); // Only show statuses that have orders
+
+  // Fallback if completely empty
+  if (statusData.length === 0) {
+    statusData.push({ name: 'No Orders', value: 1, color: '#cbd5e1', percent: '0%' });
+  }
+
+  const totalStatus = totalStatusCount;
 
   // Map real recent orders
   const displayOrders = recentOrders.length > 0 ? recentOrders : [];
@@ -166,8 +171,8 @@ const Dashboard = ({ token, searchQuery }) => {
             <div>
               <p className="text-xs text-gray-500 font-medium mb-1">Total Orders</p>
               <h3 className="text-2xl font-bold text-gray-900">{totalOrdersCount.toLocaleString()}</h3>
-              <p className="text-[11px] font-semibold text-emerald-500 mt-1 flex items-center">
-                ↑ 18.5% <span className="text-gray-400 font-normal ml-1">vs last week</span>
+              <p className="text-[11px] font-semibold text-gray-500 mt-1 flex items-center">
+                All-time
               </p>
             </div>
             <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-500 flex items-center justify-center">
@@ -189,8 +194,8 @@ const Dashboard = ({ token, searchQuery }) => {
             <div>
               <p className="text-xs text-gray-500 font-medium mb-1">Total Revenue</p>
               <h3 className="text-2xl font-bold text-gray-900">{currency}{totalRevenue.toLocaleString()}</h3>
-              <p className="text-[11px] font-semibold text-emerald-500 mt-1 flex items-center">
-                ↑ 22.7% <span className="text-gray-400 font-normal ml-1">vs last week</span>
+              <p className="text-[11px] font-semibold text-gray-500 mt-1 flex items-center">
+                All-time
               </p>
             </div>
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center">
@@ -212,8 +217,8 @@ const Dashboard = ({ token, searchQuery }) => {
             <div>
               <p className="text-xs text-gray-500 font-medium mb-1">Average Order Value</p>
               <h3 className="text-2xl font-bold text-gray-900">{currency}{avgOrderValue.toLocaleString()}</h3>
-              <p className="text-[11px] font-semibold text-emerald-500 mt-1 flex items-center">
-                ↑ 6.3% <span className="text-gray-400 font-normal ml-1">vs last week</span>
+              <p className="text-[11px] font-semibold text-gray-500 mt-1 flex items-center">
+                All-time
               </p>
             </div>
             <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-500 flex items-center justify-center">
@@ -235,8 +240,8 @@ const Dashboard = ({ token, searchQuery }) => {
             <div>
               <p className="text-xs text-gray-500 font-medium mb-1">Total Customers</p>
               <h3 className="text-2xl font-bold text-gray-900">{totalCustomers.toLocaleString()}</h3>
-              <p className="text-[11px] font-semibold text-emerald-500 mt-1 flex items-center">
-                ↑ 14.2% <span className="text-gray-400 font-normal ml-1">vs last week</span>
+              <p className="text-[11px] font-semibold text-gray-500 mt-1 flex items-center">
+                All-time
               </p>
             </div>
             <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-500 flex items-center justify-center">
@@ -258,8 +263,8 @@ const Dashboard = ({ token, searchQuery }) => {
             <div>
               <p className="text-xs text-gray-500 font-medium mb-1">Pending Orders</p>
               <h3 className="text-2xl font-bold text-gray-900">{pendingOrdersCount.toLocaleString()}</h3>
-              <p className="text-[11px] font-semibold text-red-500 mt-1 flex items-center">
-                ↓ 5.6% <span className="text-gray-400 font-normal ml-1">vs last week</span>
+              <p className="text-[11px] font-semibold text-gray-500 mt-1 flex items-center">
+                Current
               </p>
             </div>
             <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-500 flex items-center justify-center">
@@ -288,21 +293,20 @@ const Dashboard = ({ token, searchQuery }) => {
             </div>
           </div>
           <div className="flex items-center gap-6 mb-4 text-xs font-medium pl-4">
-            <div className="flex items-center gap-2"><div className="w-3 h-1 bg-blue-500 rounded"></div> <span className="text-gray-700">This Week</span></div>
-            <div className="flex items-center gap-2"><div className="w-3 h-1 bg-gray-300 rounded"></div> <span className="text-gray-500">Last Week</span></div>
+            <div className="flex items-center gap-2"><div className="w-3 h-1 bg-blue-500 rounded"></div> <span className="text-gray-700">Revenue (Last 7 Days)</span></div>
           </div>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={overviewData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <LineChart data={charts.salesTrend && charts.salesTrend.length > 0 ? charts.salesTrend : [{name: 'No Data', revenue: 0}]} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} dx={-10} />
                 <Tooltip 
                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', padding: '8px' }}
                   labelStyle={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '4px' }}
+                  formatter={(value) => [`${currency}${value.toLocaleString()}`, 'Revenue']}
                 />
-                <Line type="monotone" dataKey="thisWeek" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="lastWeek" stroke="#cbd5e1" strokeWidth={2} dot={{ r: 4, fill: '#cbd5e1', strokeWidth: 2, stroke: '#fff' }} />
+                <Line type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
