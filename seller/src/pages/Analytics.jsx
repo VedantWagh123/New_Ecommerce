@@ -10,6 +10,8 @@ import {
   BarChart, Bar, PieChart, Pie, Cell
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const currency = '₹';
 
@@ -115,35 +117,46 @@ const Analytics = ({ token }) => {
     { name: 'Amravati', count: 86, max: 500 },
   ];
 
-  // CSV Download Function
+  // PDF Download Function
   const downloadReport = () => {
     if (!data) return toast.error('No data available to download');
     try {
-      const headers = ['Metric', 'Value'];
-      const rows = [
-        ['Total Deliveries', data.overview.totalDeliveries],
-        ['Total Earnings', data.overview.totalEarnings],
-        ['Average Rating', data.overview.averageRating],
-        ['Success Rate (%)', data.overview.successRate],
-        ['Cancelled Orders', data.overview.cancelledOrders],
-        ['Failed Deliveries', data.overview.failedDeliveries],
-        ['Performance Score', data.performanceScore],
-      ];
+      const doc = new jsPDF();
       
-      const csvContent = "data:text/csv;charset=utf-8," 
-        + headers.join(",") + "\n"
-        + rows.map(e => e.join(",")).join("\n");
-        
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Seller_Analytics_Report_${timeframe}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success('Report downloaded successfully');
+      // Title
+      doc.setFontSize(18);
+      doc.text(`Seller Analytics Report`, 14, 22);
+      
+      // Subtitle
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text(`Timeframe: ${timeframe.toUpperCase()} | Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
+      
+      // Table Data
+      const tableData = [
+        ['Total Deliveries', data.overview.totalDeliveries.toString()],
+        ['Total Earnings', `Rs. ${data.overview.totalEarnings.toLocaleString()}`],
+        ['Average Rating', `${data.overview.averageRating} / 5.0`],
+        ['Success Rate', `${data.overview.successRate}%`],
+        ['Cancelled Orders', data.overview.cancelledOrders.toString()],
+        ['Failed Deliveries', data.overview.failedDeliveries.toString()],
+        ['Performance Score', `${data.performanceScore} / 100`]
+      ];
+
+      doc.autoTable({
+        startY: 40,
+        head: [['Metric', 'Value']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [79, 70, 229] }, // Indigo-600
+        styles: { fontSize: 11, cellPadding: 5 }
+      });
+
+      doc.save(`Seller_Analytics_Report_${timeframe}.pdf`);
+      toast.success('PDF Report downloaded successfully');
     } catch (err) {
-      toast.error('Failed to download report');
+      console.error(err);
+      toast.error('Failed to generate PDF');
     }
   };
 
