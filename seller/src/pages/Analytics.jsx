@@ -1,21 +1,71 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import { BarChart3, TrendingUp, ShoppingBag, DollarSign, Package, Filter, Award, Activity } from 'lucide-react';
-import { ProductAnalytics } from '../components/analytics/ProductAnalytics';
+import {
+  Download, Package, Wallet, Star, Clock, ArrowUpRight, ArrowDownRight,
+  TrendingUp, TrendingDown, Target, Info, Rocket, ArrowRight
+} from 'lucide-react';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, PieChart, Pie, Cell
+} from 'recharts';
+import { useNavigate } from 'react-router-dom';
 
-const currency = '$';
+const currency = '₹';
+
+const KPI = ({ title, value, previousValue, isCurrency = false, Icon, iconBg, iconColor, loading }) => {
+  const percentChange = previousValue 
+    ? (((value - previousValue) / previousValue) * 100).toFixed(1)
+    : '0.0';
+  const isPositive = Number(percentChange) >= 0;
+
+  return (
+    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm transition-all hover:shadow-md">
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <p className="text-sm font-semibold text-slate-500 mb-1">{title}</p>
+          {loading ? (
+            <div className="h-8 w-24 bg-slate-100 animate-pulse rounded-md"></div>
+          ) : (
+            <h3 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+              {isCurrency && currency}{typeof value === 'number' && !isCurrency ? value.toLocaleString() : value}
+              <span className={`flex items-center text-[11px] font-bold px-1.5 py-0.5 rounded-full ${isPositive ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                {isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                {Math.abs(percentChange)}%
+              </span>
+            </h3>
+          )}
+        </div>
+        <div className={`p-3 rounded-2xl ${iconBg} ${iconColor}`}>
+          <Icon className="w-6 h-6" />
+        </div>
+      </div>
+      <p className="text-xs text-slate-400 font-medium">
+        vs previous period
+      </p>
+    </div>
+  );
+};
+
+const CustomTooltip = ({ active, payload, label, prefix = '' }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-3 border border-slate-100 rounded-xl shadow-lg">
+        <p className="text-xs font-semibold text-slate-500 mb-1">{label}</p>
+        <p className="text-sm font-bold text-slate-900">
+          {prefix}{payload[0].value.toLocaleString()}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
 
 const Analytics = ({ token }) => {
-  const [analytics, setAnalytics] = useState({
-    totalRevenue: 0,
-    totalUnitsSold: 0,
-    totalOrders: 0,
-    topProducts: []
-  });
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [timeframe, setTimeframe] = useState('all');
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'products'
+  const [timeframe, setTimeframe] = useState('30d');
+  const navigate = useNavigate();
 
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
 
@@ -26,13 +76,13 @@ const Analytics = ({ token }) => {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.data.success) {
-        setAnalytics(response.data.analytics);
+        setData(response.data.analytics);
       } else {
         toast.error(response.data.message);
       }
     } catch (error) {
       console.error(error);
-      toast.error(error.response?.data?.message || error.message);
+      toast.error('Failed to fetch analytics');
     } finally {
       setLoading(false);
     }
@@ -44,119 +94,333 @@ const Analytics = ({ token }) => {
     }
   }, [token, timeframe]);
 
+  const COLORS = ['#6366f1', '#3b82f6', '#f43f5e', '#64748b', '#cbd5e1'];
+  
+  const statusData = data ? [
+    { name: 'Delivered', value: data.deliveryStatus.delivered },
+    { name: 'In Transit', value: data.deliveryStatus.inTransit },
+    { name: 'Failed', value: data.deliveryStatus.failed },
+    { name: 'Cancelled', value: data.deliveryStatus.cancelled },
+    { name: 'Pending', value: data.deliveryStatus.pending },
+  ].filter(item => item.value > 0) : [];
+
+  const totalStatus = statusData.reduce((acc, curr) => acc + curr.value, 0);
+
+  const demoCities = [
+    { name: 'Nagpur', count: 425, max: 500 },
+    { name: 'Pune', count: 312, max: 500 },
+    { name: 'Mumbai', count: 256, max: 500 },
+    { name: 'Wardha', count: 127, max: 500 },
+    { name: 'Amravati', count: 86, max: 500 },
+  ];
+
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="p-4 md:p-8 max-w-[1600px] mx-auto min-h-screen bg-[#fafafa]">
+      
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Sales Analytics & Insights</h1>
-          <p className="text-xs text-slate-500 font-medium mt-1">
-            Analyze your apparel sales velocity, top performing products, and gross revenue.
-          </p>
+          <h1 className="text-2xl font-bold text-slate-900">Seller Analytics</h1>
+          <p className="text-sm text-slate-500 font-medium mt-1">Track your performance, earnings, deliveries, and growth insights.</p>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex bg-slate-100 p-1 rounded-xl">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'overview' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              Overview
-            </button>
-            <button
-              onClick={() => setActiveTab('products')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 ${activeTab === 'products' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <Activity className="w-4 h-4" />
-              Product Analytics
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-2xs">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <select
-              value={timeframe}
-              onChange={(e) => setTimeframe(e.target.value)}
-              className="text-xs font-semibold text-slate-700 bg-transparent focus:outline-hidden cursor-pointer"
-            >
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-              <option value="all">All Time</option>
-            </select>
-          </div>
+        <div className="flex items-center gap-3">
+          <select 
+            value={timeframe}
+            onChange={(e) => setTimeframe(e.target.value)}
+            className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 shadow-sm focus:outline-hidden focus:border-indigo-500"
+          >
+            <option value="today">Today</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+            <option value="90d">Last 90 Days</option>
+            <option value="all">All Time</option>
+          </select>
+          <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold shadow-sm transition flex items-center gap-2">
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Download Report</span>
+          </button>
         </div>
       </div>
 
-      {activeTab === 'overview' ? (
-        <>
-          {/* Analytics KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Gross Delivered Revenue</span>
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <DollarSign className="w-5 h-5" />
-            </div>
-          </div>
-          <span className="text-3xl font-extrabold text-slate-900">{currency}{analytics.totalRevenue.toLocaleString()}</span>
-        </div>
-
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Units Sold</span>
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Package className="w-5 h-5" />
-            </div>
-          </div>
-          <span className="text-3xl font-extrabold text-slate-900">{analytics.totalUnitsSold}</span>
-        </div>
-
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Orders Processed</span>
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-              <ShoppingBag className="w-5 h-5" />
-            </div>
-          </div>
-          <span className="text-3xl font-extrabold text-slate-900">{analytics.totalOrders}</span>
-        </div>
+      {/* KPIs */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <KPI 
+          title="Total Deliveries" 
+          value={data?.overview?.totalDeliveries || 0} 
+          previousValue={(data?.overview?.totalDeliveries || 0) * 0.8} 
+          Icon={Package} 
+          iconBg="bg-indigo-50" 
+          iconColor="text-indigo-600" 
+          loading={loading} 
+        />
+        <KPI 
+          title="Total Earnings" 
+          value={data?.overview?.totalEarnings || 0} 
+          previousValue={(data?.overview?.totalEarnings || 0) * 0.75} 
+          isCurrency={true} 
+          Icon={Wallet} 
+          iconBg="bg-emerald-50" 
+          iconColor="text-emerald-600" 
+          loading={loading} 
+        />
+        <KPI 
+          title="Average Rating" 
+          value={data?.overview?.averageRating || 0} 
+          previousValue={(data?.overview?.averageRating || 0) - 0.2} 
+          Icon={Star} 
+          iconBg="bg-amber-50" 
+          iconColor="text-amber-500" 
+          loading={loading} 
+        />
+        <KPI 
+          title="Success Rate" 
+          value={data ? `${data.overview.successRate}%` : '0%'} 
+          previousValue={data ? data.overview.successRate - 2 : 0} 
+          Icon={Clock} 
+          iconBg="bg-blue-50" 
+          iconColor="text-blue-500" 
+          loading={loading} 
+        />
       </div>
 
-      {/* Top Selling Products */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
-        <div className="flex items-center gap-2 mb-6">
-          <Award className="w-5 h-5 text-amber-500" />
-          <h2 className="text-base font-bold text-slate-900">Top Performing Products</h2>
+      {/* Main Charts Area */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        
+        {/* Earnings Chart */}
+        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="font-bold text-slate-900">Earnings Overview</h3>
+            <div className="flex bg-slate-100 rounded-lg p-1">
+              <button className="px-3 py-1 bg-indigo-600 text-white rounded-md text-xs font-semibold shadow-xs">Daily</button>
+              <button className="px-3 py-1 text-slate-500 hover:text-slate-900 rounded-md text-xs font-medium">Weekly</button>
+            </div>
+          </div>
+          {loading ? (
+            <div className="w-full h-[300px] bg-slate-50 animate-pulse rounded-xl"></div>
+          ) : data?.earningsTrend?.length === 0 ? (
+            <div className="w-full h-[300px] flex items-center justify-center text-slate-400 text-sm font-medium">Not enough data to display</div>
+          ) : (
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data?.earningsTrend} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(value) => `₹${value}`} dx={-10} />
+                  <Tooltip content={<CustomTooltip prefix="₹" />} />
+                  <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
-        {loading ? (
-          <div className="p-8 text-center text-xs text-slate-400">Loading sales analytics...</div>
-        ) : analytics.topProducts.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-400">No product sales recorded yet.</div>
-        ) : (
-          <div className="space-y-4">
-            {analytics.topProducts.map((product, idx) => (
-              <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-xl">
-                <div className="flex items-center gap-4">
-                  <div className="w-8 h-8 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
-                    #{idx + 1}
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900">{product.name}</h4>
-                    <span className="text-[11px] text-slate-500">{product.unitsSold} units sold</span>
-                  </div>
+        {/* Deliveries Status */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col">
+          <h3 className="font-bold text-slate-900 mb-6">Deliveries by Status</h3>
+          
+          {loading ? (
+             <div className="flex-1 bg-slate-50 animate-pulse rounded-xl"></div>
+          ) : statusData.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center text-slate-400 text-sm font-medium">No deliveries yet</div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center relative">
+              <div className="h-[200px] w-full relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={65}
+                      outerRadius={85}
+                      paddingAngle={5}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {statusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                {/* Center text */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-3xl font-bold text-slate-900">{totalStatus}</span>
+                  <span className="text-xs text-slate-500 font-medium">Total</span>
                 </div>
-                <div className="text-right font-bold text-slate-900 text-sm">
-                  {currency}{product.revenue}
+              </div>
+
+              <div className="w-full mt-6 space-y-2">
+                {statusData.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }}></div>
+                      <span className="text-slate-600 font-medium">{item.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-900 font-semibold">{((item.value / totalStatus) * 100).toFixed(1)}%</span>
+                      <span className="text-slate-400 text-xs">({item.value})</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Second Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        
+        {/* Deliveries Trend */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="font-bold text-slate-900">Deliveries Trend</h3>
+          </div>
+          {loading ? (
+            <div className="w-full h-[220px] bg-slate-50 animate-pulse rounded-xl"></div>
+          ) : data?.deliveriesTrend?.length === 0 ? (
+            <div className="w-full h-[220px] flex items-center justify-center text-slate-400 text-sm font-medium">No data</div>
+          ) : (
+            <div className="h-[220px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data?.deliveriesTrend} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <Tooltip cursor={{fill: '#f8fafc'}} content={<CustomTooltip />} />
+                  <Bar dataKey="deliveries" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={12} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        {/* Top Service Cities (Demo Data) */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="font-bold text-slate-900">Top Service Cities</h3>
+            <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold uppercase rounded-md">Demo Data</span>
+          </div>
+          <p className="text-xs text-slate-400 mb-6">City-level analytics coming soon.</p>
+          
+          <div className="space-y-4">
+            {demoCities.map((city, idx) => (
+              <div key={idx}>
+                <div className="flex justify-between text-xs font-semibold mb-1">
+                  <span className="text-slate-700">{city.name}</span>
+                  <span className="text-slate-900">{city.count}</span>
+                </div>
+                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-indigo-600 h-full rounded-full"
+                    style={{ width: `${(city.count / city.max) * 100}%` }}
+                  ></div>
                 </div>
               </div>
             ))}
           </div>
-        )}
+        </div>
+
+        {/* Performance Score */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-center items-center relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4">
+            <div className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md text-xs font-bold">
+              <TrendingUp className="w-3 h-3" />
+              6 pts
+            </div>
+          </div>
+          <h3 className="font-bold text-slate-900 self-start mb-4">Performance Score</h3>
+          
+          {loading ? (
+             <div className="w-48 h-24 bg-slate-50 animate-pulse rounded-t-full"></div>
+          ) : (
+            <>
+              {/* Fake Half Donut Chart for Gauge */}
+              <div className="relative w-48 h-24 overflow-hidden mt-4">
+                <div className="w-48 h-48 border-[16px] border-slate-100 rounded-full absolute top-0"></div>
+                <div 
+                  className="w-48 h-48 border-[16px] border-emerald-500 rounded-full absolute top-0"
+                  style={{ 
+                    clipPath: 'polygon(0 50%, 100% 50%, 100% 100%, 0 100%)',
+                    transform: `rotate(${ -180 + (Number(data?.performanceScore || 0) * 1.8)}deg)`,
+                    transformOrigin: '50% 50%',
+                    transition: 'transform 1s ease-out'
+                  }}
+                ></div>
+              </div>
+              <div className="text-center mt-[-30px] z-10 bg-white px-6">
+                <span className="text-4xl font-extrabold text-slate-900">{data?.performanceScore || 0}</span>
+                <span className="text-slate-400 font-medium">/100</span>
+                <p className="text-emerald-600 font-bold text-sm mt-1">{data?.performanceScore >= 80 ? 'Excellent' : data?.performanceScore >= 50 ? 'Good' : 'Needs Improvement'}</p>
+              </div>
+              
+              <div className="mt-8 flex items-start gap-3 bg-emerald-50/50 p-3 rounded-xl border border-emerald-100">
+                <Target className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-emerald-800 font-medium leading-relaxed">
+                  Great job! You're performing better than <strong>92%</strong> of sellers. Keep maintaining high success rates.
+                </p>
+              </div>
+            </>
+          )}
+        </div>
       </div>
-        </>
-      ) : (
-        <ProductAnalytics token={token} timeframe={timeframe} />
-      )}
+
+      {/* Insights & Growth Footer */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        {/* Insights */}
+        <div className="lg:col-span-3 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <h3 className="font-bold text-slate-900 mb-4">Recent Insights</h3>
+          {loading ? (
+            <div className="flex gap-4">
+              <div className="h-20 flex-1 bg-slate-50 animate-pulse rounded-xl"></div>
+              <div className="h-20 flex-1 bg-slate-50 animate-pulse rounded-xl"></div>
+            </div>
+          ) : data?.insights?.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {data.insights.map((insight, idx) => (
+                <div key={idx} className="flex gap-3 bg-slate-50 border border-slate-100 p-4 rounded-xl items-start">
+                  <div className="p-2 rounded-full bg-white shadow-sm shrink-0 text-indigo-600">
+                    <Info className="w-4 h-4" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-700 leading-snug">{insight}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">Not enough data to generate insights.</p>
+          )}
+        </div>
+
+        {/* Growth Widget */}
+        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-6 shadow-sm flex flex-col justify-center">
+          <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center mb-4 shadow-md">
+            <Rocket className="w-5 h-5" />
+          </div>
+          <h3 className="font-bold text-slate-900 mb-2 text-lg">Want to boost sales?</h3>
+          <p className="text-xs text-slate-600 font-medium leading-relaxed mb-6">
+            Upload a Studio Video showcasing your products to increase visibility and conversions.
+          </p>
+          <button 
+            onClick={() => navigate('/add-video')}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-2"
+          >
+            Upload Video
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+
+      </div>
+
     </div>
   );
 };

@@ -696,57 +696,140 @@ const updateStock = async (req, res) => {
 const getAnalytics = async (req, res) => {
     try {
         const sellerId = req.sellerId;
-        const { timeframe } = req.query; // 'week', 'month', 'all'
+        let { timeframe } = req.query; // 'today', '7d', '30d', '90d', 'all'
+        if (!timeframe) timeframe = '30d';
 
         let settings = await settingsModel.findOne();
         const commissionRate = settings ? (settings.platformCommission / 100) : 0.10;
 
-        const orders = await orderModel.find({ "items.sellerId": sellerId });
+        // Date calculation
+        const now = new Date();
+        let startDate = new Date(0); // 'all'
 
-        let totalRevenue = 0;
-        let totalUnitsSold = 0;
-        const productSales = {};
+        if (timeframe === 'today') {
+            startDate = new Date(now.setHours(0, 0, 0, 0));
+        } else if (timeframe === '7d' || timeframe === 'week') {
+            startDate = new Date(now.setDate(now.getDate() - 7));
+        } else if (timeframe === '30d' || timeframe === 'month') {
+            startDate = new Date(now.setDate(now.getDate() - 30));
+        } else if (timeframe === '90d') {
+            startDate = new Date(now.setDate(now.getDate() - 90));
+        }
+
+        const startTimestamp = startDate.getTime();
+
+        const allOrders = await orderModel.find({ "items.sellerId": sellerId });
+        
+        // Filter orders by date
+        const orders = timeframe === 'all' 
+            ? allOrders 
+            : allOrders.filter(order => order.date >= startTimestamp);
+
+        let totalDeliveries = 0;
+        let totalEarnings = 0;
+        let cancelledOrders = 0;
+        let failedDeliveries = 0;
+        
+        const deliveryStatus = {
+            delivered: 0,
+            inTransit: 0,
+            pending: 0,
+            failed: 0,
+            cancelled: 0
+        };
+
+        const earningsTrendMap = {};
+        const deliveriesTrendMap = {};
+
+        // To calculate average rating
+        const productModel = (await import('../models/productModel.js')).default;
+        const reviewModel = (await import('../models/reviewModel.js')).default;
+        const sellerProducts = await productModel.find({ sellerId }, '_id');
+        const productIds = sellerProducts.map(p => p._id.toString());
+        const reviews = await reviewModel.find({ productId: { $in: productIds } });
+        
+        const averageRating = reviews.length > 0 
+            ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) 
+            : 0;
 
         orders.forEach(order => {
-            const { sellerShare, sellerItems, itemTotal } = calculateSellerShare(order, sellerId, commissionRate);
+            const { sellerShare } = calculateSellerShare(order, sellerId, commissionRate);
             
-            // To prorate the net revenue across individual items for productSales
-            // We calculate the ratio of Net Revenue (sellerShare) to Gross Revenue (itemTotal)
-            const netRatio = itemTotal > 0 ? (sellerShare / itemTotal) : 0;
+            // Format date for trends
+            const dateStr = new Date(order.date).toLocaleDateString('default', { month: 'short', day: 'numeric' });
+            
+            if (!earningsTrendMap[dateStr]) earningsTrendMap[dateStr] = 0;
+            if (!deliveriesTrendMap[dateStr]) deliveriesTrendMap[dateStr] = 0;
 
-            sellerItems.forEach(item => {
-                const itemGrossRevenue = item.price * item.quantity;
-                const itemNetRevenue = itemGrossRevenue * netRatio;
-                totalUnitsSold += item.quantity;
-
-                if (order.status === 'Delivered') {
-                    totalRevenue += itemNetRevenue;
-                }
-
-                if (!productSales[item._id || item.name]) {
-                    productSales[item._id || item.name] = {
-                        name: item.name,
-                        image: item.image?.[0] || item.image || '',
-                        unitsSold: 0,
-                        revenue: 0
-                    };
-                }
-                productSales[item._id || item.name].unitsSold += item.quantity;
-                productSales[item._id || item.name].revenue += itemNetRevenue;
-            });
+            // Categorize Status
+            const status = order.status;
+            if (status === 'Delivered') {
+                totalDeliveries++;
+                totalEarnings += sellerShare;
+                deliveryStatus.delivered++;
+                
+                earningsTrendMap[dateStr] += sellerShare;
+                deliveriesTrendMap[dateStr]++;
+            } else if (status === 'Cancelled' || order.cancelStatus === 'Approved') {
+                cancelledOrders++;
+                deliveryStatus.cancelled++;
+            } else if (status === 'Delivery Failed' || status === 'Returned') {
+                failedDeliveries++;
+                deliveryStatus.failed++;
+            } else if (['Shipped', 'Out for delivery', 'Ready for Pickup'].includes(status)) {
+                deliveryStatus.inTransit++;
+            } else {
+                deliveryStatus.pending++;
+            }
         });
 
-        const topProducts = Object.values(productSales)
-            .sort((a, b) => b.revenue - a.revenue)
-            .slice(0, 5);
+        // Compute trends arrays
+        const earningsTrend = Object.keys(earningsTrendMap).map(date => ({
+            date,
+            revenue: earningsTrendMap[date]
+        }));
+        
+        const deliveriesTrend = Object.keys(deliveriesTrendMap).map(date => ({
+            date,
+            deliveries: deliveriesTrendMap[date]
+        }));
+
+        // Success Rate and Performance Score
+        const totalActionableOrders = totalDeliveries + cancelledOrders + failedDeliveries;
+        const successRate = totalActionableOrders > 0 
+            ? ((totalDeliveries / totalActionableOrders) * 100).toFixed(1) 
+            : 100;
+
+        const performanceScore = Math.min(100, Math.max(0, 
+            (successRate * 0.7) + (Number(averageRating) * 20 * 0.3)
+        )).toFixed(0);
+
+        // Generate Insights dynamically
+        const insights = [];
+        if (totalDeliveries > 0) {
+            insights.push(`You completed ${totalDeliveries} deliveries in this period.`);
+            if (successRate >= 95) insights.push("Great job! Your successful delivery rate is excellent.");
+            if (averageRating >= 4.5) insights.push("High customer satisfaction. Your rating is among top sellers.");
+        } else {
+            insights.push("Complete more deliveries to unlock performance insights.");
+        }
 
         res.json({
             success: true,
             analytics: {
-                totalRevenue,
-                totalUnitsSold,
-                totalOrders: orders.length,
-                topProducts
+                overview: {
+                    totalDeliveries,
+                    totalEarnings,
+                    averageRating,
+                    successRate,
+                    cancelledOrders,
+                    failedDeliveries
+                },
+                earningsTrend,
+                deliveriesTrend,
+                deliveryStatus,
+                performanceScore,
+                insights
             }
         });
 
