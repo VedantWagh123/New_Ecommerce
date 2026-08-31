@@ -65,6 +65,7 @@ const Analytics = ({ token }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState('30d');
+  const [earningsView, setEarningsView] = useState('daily');
   const navigate = useNavigate();
 
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
@@ -114,6 +115,65 @@ const Analytics = ({ token }) => {
     { name: 'Amravati', count: 86, max: 500 },
   ];
 
+  // CSV Download Function
+  const downloadReport = () => {
+    if (!data) return toast.error('No data available to download');
+    try {
+      const headers = ['Metric', 'Value'];
+      const rows = [
+        ['Total Deliveries', data.overview.totalDeliveries],
+        ['Total Earnings', data.overview.totalEarnings],
+        ['Average Rating', data.overview.averageRating],
+        ['Success Rate (%)', data.overview.successRate],
+        ['Cancelled Orders', data.overview.cancelledOrders],
+        ['Failed Deliveries', data.overview.failedDeliveries],
+        ['Performance Score', data.performanceScore],
+      ];
+      
+      const csvContent = "data:text/csv;charset=utf-8," 
+        + headers.join(",") + "\n"
+        + rows.map(e => e.join(",")).join("\n");
+        
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Seller_Analytics_Report_${timeframe}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success('Report downloaded successfully');
+    } catch (err) {
+      toast.error('Failed to download report');
+    }
+  };
+
+  // Process Earnings Trend based on view (Daily vs Weekly)
+  const getProcessedEarningsTrend = () => {
+    if (!data?.earningsTrend) return [];
+    if (earningsView === 'daily') return data.earningsTrend;
+    
+    // Process weekly
+    const weeklyMap = {};
+    data.earningsTrend.forEach(item => {
+      // Assuming 'date' is string like 'Aug 21'
+      // To properly group by week, we would need actual Dates, but since it's just 'MMM DD', 
+      // simple grouping by chunking every 7 days is easiest for display.
+      // Alternatively, we can just group by Week Number if we parse it.
+      const d = new Date(item.date + ', ' + new Date().getFullYear());
+      const weekStart = new Date(d.setDate(d.getDate() - d.getDay())).toLocaleDateString('default', { month: 'short', day: 'numeric' });
+      
+      if (!weeklyMap[weekStart]) weeklyMap[weekStart] = 0;
+      weeklyMap[weekStart] += item.revenue;
+    });
+
+    return Object.keys(weeklyMap).map(week => ({
+      date: `Week of ${week}`,
+      revenue: weeklyMap[week]
+    }));
+  };
+
+  const currentEarningsTrend = getProcessedEarningsTrend();
+
   return (
     <div className="p-4 md:p-8 max-w-[1600px] mx-auto min-h-screen bg-[#fafafa]">
       
@@ -136,7 +196,7 @@ const Analytics = ({ token }) => {
             <option value="90d">Last 90 Days</option>
             <option value="all">All Time</option>
           </select>
-          <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold shadow-sm transition flex items-center gap-2">
+          <button onClick={downloadReport} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold shadow-sm transition flex items-center gap-2">
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Download Report</span>
           </button>
@@ -192,18 +252,28 @@ const Analytics = ({ token }) => {
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-bold text-slate-900">Earnings Overview</h3>
             <div className="flex bg-slate-100 rounded-lg p-1">
-              <button className="px-3 py-1 bg-indigo-600 text-white rounded-md text-xs font-semibold shadow-xs">Daily</button>
-              <button className="px-3 py-1 text-slate-500 hover:text-slate-900 rounded-md text-xs font-medium">Weekly</button>
+              <button 
+                onClick={() => setEarningsView('daily')}
+                className={`px-3 py-1 rounded-md text-xs font-semibold ${earningsView === 'daily' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-900 font-medium'}`}
+              >
+                Daily
+              </button>
+              <button 
+                onClick={() => setEarningsView('weekly')}
+                className={`px-3 py-1 rounded-md text-xs font-semibold ${earningsView === 'weekly' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-900 font-medium'}`}
+              >
+                Weekly
+              </button>
             </div>
           </div>
           {loading ? (
             <div className="w-full h-[300px] bg-slate-50 animate-pulse rounded-xl"></div>
-          ) : data?.earningsTrend?.length === 0 ? (
+          ) : currentEarningsTrend.length === 0 ? (
             <div className="w-full h-[300px] flex items-center justify-center text-slate-400 text-sm font-medium">Not enough data to display</div>
           ) : (
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data?.earningsTrend} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+                <AreaChart data={currentEarningsTrend} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
