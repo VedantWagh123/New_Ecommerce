@@ -359,7 +359,7 @@ const Profile = () => {
                                         Your store is live! Access products, orders, inventory, and payouts.
                                     </p>
                                     <button 
-                                        onClick={() => window.open(`http://localhost:5175/?sso_token=${token}`, '_blank')} 
+                                        onClick={() => window.open(`${import.meta.env.VITE_SELLER_URL || 'http://localhost:5175'}/?sso_token=${token}`, '_blank')} 
                                         className='mt-5 w-full py-3 bg-gray-900 hover:bg-gray-800 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2'
                                     >
                                         OPEN DASHBOARD <ArrowRight className="w-3.5 h-3.5" />
@@ -375,7 +375,7 @@ const Profile = () => {
                                         Your seller application is under review by admin moderation. Check back shortly!
                                     </p>
                                     <button 
-                                        onClick={() => window.open(`http://localhost:5175/?sso_token=${token}`, '_blank')} 
+                                        onClick={() => window.open(`${import.meta.env.VITE_SELLER_URL || 'http://localhost:5175'}/?sso_token=${token}`, '_blank')} 
                                         className='mt-5 w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2'
                                     >
                                         CHECK STATUS <ArrowRight className="w-3.5 h-3.5" />
@@ -432,7 +432,7 @@ const Profile = () => {
                                         You are an approved Delivery Partner. Access your portal to accept orders and earn.
                                     </p>
                                     <button 
-                                        onClick={() => window.open(`http://localhost:5176/?sso_token=${token}`, '_blank')} 
+                                        onClick={() => window.open(`${import.meta.env.VITE_DELIVERY_URL || 'http://localhost:5176'}/?sso_token=${token}`, '_blank')} 
                                         className='mt-5 w-full py-3 bg-gray-900 hover:bg-gray-800 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2'
                                     >
                                         OPEN DELIVERY PORTAL <ArrowRight className="w-3.5 h-3.5" />
