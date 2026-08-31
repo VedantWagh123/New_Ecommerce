@@ -2,7 +2,7 @@ export const ORDER_STATUS = {
     PACKING: 'Packing',
     ACCEPTED: 'Accepted',
     PACKED: 'Packed',
-    READY_TO_SHIP: 'Ready to Ship',
+    READY_FOR_PICKUP: 'Ready for Pickup',
     HANDED_TO_LOGISTICS: 'Handed to Logistics',
     SHIPPED: 'Shipped',
     IN_TRANSIT: 'In Transit',
@@ -18,7 +18,7 @@ export const STATUS_STEPS = [
     ORDER_STATUS.PACKING,
     ORDER_STATUS.ACCEPTED,
     ORDER_STATUS.PACKED,
-    ORDER_STATUS.READY_TO_SHIP,
+    ORDER_STATUS.READY_FOR_PICKUP,
     ORDER_STATUS.HANDED_TO_LOGISTICS,
     ORDER_STATUS.SHIPPED,
     ORDER_STATUS.IN_TRANSIT,
@@ -38,7 +38,7 @@ export const getStatusBadgeStyle = (status) => {
             return 'bg-blue-50 text-blue-700 border-blue-200';
         case ORDER_STATUS.ACCEPTED:
         case ORDER_STATUS.PACKED:
-        case ORDER_STATUS.READY_TO_SHIP:
+        case ORDER_STATUS.READY_FOR_PICKUP:
         case ORDER_STATUS.HANDED_TO_LOGISTICS:
             return 'bg-purple-50 text-purple-700 border-purple-200';
         case ORDER_STATUS.SHIPPED:

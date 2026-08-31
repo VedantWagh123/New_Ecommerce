@@ -27,6 +27,7 @@ import StoreProfile from './pages/StoreProfile';
 import Settings from './pages/Settings';
 import AddVideo from './pages/AddVideo';
 import ManageVideos from './pages/ManageVideos';
+import Returns from './pages/Returns';
 
 export const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
 export const currency = '$';
@@ -180,6 +181,7 @@ const App = () => {
             <Route path="/settings" element={<Settings token={token} setToken={setToken} />} />
             <Route path="/add-video" element={<AddVideo token={token} />} />
             <Route path="/manage-videos" element={<ManageVideos token={token} />} />
+            <Route path="/returns" element={<Returns token={token} searchQuery={searchQuery} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

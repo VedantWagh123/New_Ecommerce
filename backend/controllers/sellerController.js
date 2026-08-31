@@ -593,22 +593,30 @@ const updateSellerOrderStatus = async (req, res) => {
 
         const validSellerStatuses = ['Packing', 'Accepted', 'Packed', 'Ready for Pickup'];
         const currentStatusIdx = validSellerStatuses.indexOf(order.status);
-        const nextStatusIdx = validSellerStatuses.indexOf(status);
-
+        
         if (currentStatusIdx === -1) {
             return res.json({ success: false, message: `Order has passed seller control (Current Status: ${order.status})` });
         }
 
-        if (nextStatusIdx === -1) {
-            return res.json({ success: false, message: "Sellers cannot set Admin/Logistics statuses manually." });
-        }
+        // Specific allow-list for seller cancelling/rejecting an order
+        if (status === 'Cancelled') {
+            if (order.status !== 'Packing' && order.status !== 'Accepted') {
+                return res.json({ success: false, message: `Cannot reject order after it has been packed or dispatched.` });
+            }
+        } else {
+            const nextStatusIdx = validSellerStatuses.indexOf(status);
+            
+            if (nextStatusIdx === -1) {
+                return res.json({ success: false, message: "Sellers cannot set Admin/Logistics statuses manually." });
+            }
 
-        if (nextStatusIdx <= currentStatusIdx) {
-            return res.json({ success: false, message: "Cannot move order status backwards." });
-        }
+            if (nextStatusIdx <= currentStatusIdx) {
+                return res.json({ success: false, message: "Cannot move order status backwards." });
+            }
 
-        if (nextStatusIdx !== currentStatusIdx + 1) {
-            return res.json({ success: false, message: `Invalid transition. Next valid status is: ${validSellerStatuses[currentStatusIdx + 1]}` });
+            if (nextStatusIdx !== currentStatusIdx + 1) {
+                return res.json({ success: false, message: `Invalid transition. Next valid status is: ${validSellerStatuses[currentStatusIdx + 1]}` });
+            }
         }
 
         const now = Date.now();
@@ -1183,6 +1191,161 @@ const deleteSelfAccount = async (req, res) => {
     }
 };
 
+// ------------------------------------------------------------------
+// RETURN & QC WORKFLOW (SELLER)
+// ------------------------------------------------------------------
+
+const getReturns = async (req, res) => {
+    try {
+        const sellerId = req.sellerId;
+        // Fetch orders that belong to this seller and have a return requested
+        const orders = await orderModel.find({ 
+            "items.sellerId": sellerId, 
+            returnStatus: { $ne: 'None' } 
+        }).sort({ returnDate: -1 });
+
+        const formattedReturns = orders.map(order => {
+            const sellerItems = order.items.filter(item => item.sellerId === sellerId);
+            return {
+                _id: order._id,
+                userId: order.userId,
+                items: sellerItems,
+                returnStatus: order.returnStatus,
+                returnReason: order.returnReason,
+                returnImages: order.returnImages,
+                returnDate: order.returnDate,
+                date: order.date
+            };
+        });
+
+        res.json({ success: true, returns: formattedReturns });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+const approveReturn = async (req, res) => {
+    try {
+        const { orderId } = req.body;
+        const sellerId = req.sellerId;
+
+        const order = await orderModel.findOne({ _id: orderId, "items.sellerId": sellerId });
+        if (!order) return res.json({ success: false, message: "Order not found" });
+
+        if (order.returnStatus !== 'Requested') {
+            return res.json({ success: false, message: "Return not in Requested state." });
+        }
+
+        const history = order.statusHistory || [];
+        history.push({
+            status: 'Return Approved',
+            timestamp: Date.now(),
+            updatedBy: req.seller?.storeName || 'Seller',
+            note: 'Return approved by seller. Awaiting pickup assignment.'
+        });
+
+        order.returnStatus = 'Approved';
+        order.statusHistory = history;
+        order.updatedAt = Date.now();
+        // Clear delivery partner ID so it can be reassigned for reverse pickup
+        order.deliveryPartnerId = null;
+
+        await order.save();
+        
+        await sendNotification('user', order.userId, 'Return Approved', `Your return request for Order #${order._id.toString().slice(-8).toUpperCase()} has been approved.`, order._id);
+        emitOrderUpdate(order);
+
+        res.json({ success: true, message: "Return approved successfully." });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+const rejectReturn = async (req, res) => {
+    try {
+        const { orderId, reason } = req.body;
+        const sellerId = req.sellerId;
+
+        const order = await orderModel.findOne({ _id: orderId, "items.sellerId": sellerId });
+        if (!order) return res.json({ success: false, message: "Order not found" });
+
+        if (order.returnStatus !== 'Requested') {
+            return res.json({ success: false, message: "Return not in Requested state." });
+        }
+
+        const history = order.statusHistory || [];
+        history.push({
+            status: 'Return Rejected',
+            timestamp: Date.now(),
+            updatedBy: req.seller?.storeName || 'Seller',
+            note: `Return rejected. Reason: ${reason || 'Not specified'}`
+        });
+
+        order.returnStatus = 'Rejected';
+        order.statusHistory = history;
+        order.updatedAt = Date.now();
+
+        await order.save();
+        
+        await sendNotification('user', order.userId, 'Return Rejected', `Your return request for Order #${order._id.toString().slice(-8).toUpperCase()} was rejected.`, order._id);
+        emitOrderUpdate(order);
+
+        res.json({ success: true, message: "Return rejected successfully." });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+const updateReturnQC = async (req, res) => {
+    try {
+        const { orderId, passed, reason } = req.body;
+        const sellerId = req.sellerId;
+
+        const order = await orderModel.findOne({ _id: orderId, "items.sellerId": sellerId });
+        if (!order) return res.json({ success: false, message: "Order not found" });
+
+        // Seller can only QC if the item has been received or is in transit to them
+        if (!['In Transit', 'Received'].includes(order.returnStatus)) {
+            return res.json({ success: false, message: `Cannot perform QC. Current status: ${order.returnStatus}` });
+        }
+
+        const now = Date.now();
+        const history = order.statusHistory || [];
+        
+        if (passed) {
+            history.push({
+                status: 'Return QC Passed',
+                timestamp: now,
+                updatedBy: req.seller?.storeName || 'Seller',
+                note: 'Product received and Quality Check passed. Refund pending.'
+            });
+            order.returnStatus = 'Received';
+            order.refundStatus = 'Pending';
+        } else {
+            history.push({
+                status: 'Return QC Failed',
+                timestamp: now,
+                updatedBy: req.seller?.storeName || 'Seller',
+                note: `Quality Check failed. Reason: ${reason || 'Damaged/Missing items'}`
+            });
+            order.returnStatus = 'QC Failed';
+            order.refundStatus = 'Failed';
+        }
+
+        order.statusHistory = history;
+        order.updatedAt = now;
+
+        await order.save();
+        
+        await sendNotification('admin', null, passed ? 'Refund Pending' : 'QC Failed', `Order #${order._id.toString().slice(-8).toUpperCase()} QC ${passed ? 'passed' : 'failed'} by seller.`, order._id);
+        emitOrderUpdate(order);
+
+        res.json({ success: true, message: `QC ${passed ? 'Passed' : 'Failed'} recorded successfully.` });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
 export {
     registerSeller,
     applyForSeller,
@@ -1204,5 +1367,9 @@ export {
     getEarnings,
     requestPayout,
     getSellerReviews,
-    deleteSelfAccount
+    deleteSelfAccount,
+    getReturns,
+    approveReturn,
+    rejectReturn,
+    updateReturnQC
 };

@@ -5,6 +5,7 @@ import { Store, ArrowRight, Lock, Mail, User, Phone, FileText, CheckCircle2, Eye
 import { Link } from 'react-router-dom';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
+const frontendUrl = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
 
 const Login = ({ setToken }) => {
   const [email, setEmail] = useState('');
@@ -106,7 +107,7 @@ const Login = ({ setToken }) => {
 
         <div className="mt-6 pt-6 border-t border-slate-100 text-center">
           <p className="text-[11px] text-slate-400">
-            Want to become a Wishmaster? <a href="http://localhost:5173/profile" target="_blank" className="text-indigo-600 font-bold hover:underline">Apply here</a>
+            Want to become a Wishmaster? <a href={`${frontendUrl}/profile`} target="_blank" className="text-indigo-600 font-bold hover:underline">Apply here</a>
           </p>
         </div>
       </div>

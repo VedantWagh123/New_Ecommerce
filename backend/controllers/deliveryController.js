@@ -384,4 +384,86 @@ const requestDeliveryPayout = async (req, res) => {
     }
 };
 
-export { getMyDeliveries, acceptDelivery, pickupOrder, deliverOrder, updateDeliveryStatus, collectCOD, getDeliveryEarnings, requestDeliveryPayout };
+// ------------------------------------------------------------------
+// RETURN WORKFLOW (DELIVERY PARTNER)
+// ------------------------------------------------------------------
+
+const pickupReturn = async (req, res) => {
+    try {
+        const { orderId } = req.body; // OTP can be added if needed
+        const deliveryPartnerId = req.deliveryPartnerId;
+
+        const order = await orderModel.findOne({ _id: orderId, deliveryPartnerId });
+        if (!order) return res.json({ success: false, message: 'Order not found or unauthorized' });
+
+        if (order.returnStatus !== 'Approved') {
+            return res.json({ success: false, message: 'Return must be Approved before pickup' });
+        }
+
+        const history = order.statusHistory || [];
+        history.push({
+            status: 'Return Picked Up',
+            timestamp: Date.now(),
+            updatedBy: req.deliveryPartner?.name || 'Wishmaster',
+            note: 'Return item successfully picked up from customer.'
+        });
+
+        order.returnStatus = 'In Transit';
+        order.statusHistory = history;
+        await order.save();
+
+        await sendNotification('admin', null, 'Return Picked Up', `Return for Order #${order._id.toString().slice(-8).toUpperCase()} picked up from customer.`, order._id);
+        const sellers = getUniqueSellerIds(order);
+        for (const sid of sellers) {
+            await sendNotification('seller', sid, 'Return Picked Up', `Return for Order #${order._id.toString().slice(-8).toUpperCase()} has been picked up from the customer.`, order._id);
+        }
+        
+        emitOrderUpdate(order);
+
+        res.json({ success: true, message: 'Return picked up successfully.', order });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+};
+
+const deliverReturn = async (req, res) => {
+    try {
+        const { orderId } = req.body;
+        const deliveryPartnerId = req.deliveryPartnerId;
+
+        const order = await orderModel.findOne({ _id: orderId, deliveryPartnerId });
+        if (!order) return res.json({ success: false, message: 'Order not found or unauthorized' });
+
+        if (order.returnStatus !== 'In Transit') {
+            return res.json({ success: false, message: 'Return must be In Transit before completing delivery to seller' });
+        }
+
+        const history = order.statusHistory || [];
+        history.push({
+            status: 'Return Delivered to Seller',
+            timestamp: Date.now(),
+            updatedBy: req.deliveryPartner?.name || 'Wishmaster',
+            note: 'Return item successfully delivered back to seller.'
+        });
+
+        order.returnStatus = 'Received'; // Now seller will do QC
+        order.statusHistory = history;
+        await order.save();
+
+        await sendNotification('admin', null, 'Return Delivered to Seller', `Return for Order #${order._id.toString().slice(-8).toUpperCase()} delivered to seller.`, order._id);
+        const sellers = getUniqueSellerIds(order);
+        for (const sid of sellers) {
+            await sendNotification('seller', sid, 'Return Delivered', `Return for Order #${order._id.toString().slice(-8).toUpperCase()} has been delivered to you for QC.`, order._id);
+        }
+        
+        emitOrderUpdate(order);
+
+        res.json({ success: true, message: 'Return Delivered to Seller Successfully!', order });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+};
+
+export { getMyDeliveries, acceptDelivery, pickupOrder, deliverOrder, updateDeliveryStatus, collectCOD, getDeliveryEarnings, requestDeliveryPayout, pickupReturn, deliverReturn };

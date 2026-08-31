@@ -1,5 +1,5 @@
 import express from 'express';
-import { acceptDelivery, getMyDeliveries, pickupOrder, deliverOrder, updateDeliveryStatus, collectCOD, getDeliveryEarnings, requestDeliveryPayout } from '../controllers/deliveryController.js';
+import { acceptDelivery, getMyDeliveries, pickupOrder, deliverOrder, updateDeliveryStatus, collectCOD, getDeliveryEarnings, requestDeliveryPayout, pickupReturn, deliverReturn } from '../controllers/deliveryController.js';
 import deliveryAuth from '../middleware/deliveryAuth.js';
 
 const deliveryRouter = express.Router();
@@ -14,5 +14,8 @@ deliveryRouter.post('/collect-cod', deliveryAuth, collectCOD);
 
 deliveryRouter.get('/earnings', deliveryAuth, getDeliveryEarnings);
 deliveryRouter.post('/earnings/payout', deliveryAuth, requestDeliveryPayout);
+
+deliveryRouter.post('/return/pickup', deliveryAuth, pickupReturn);
+deliveryRouter.post('/return/deliver', deliveryAuth, deliverReturn);
 
 export default deliveryRouter;

@@ -25,6 +25,11 @@ const Orders = ({ token, searchQuery }) => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
+  
+  // Reject Modal State
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [orderToReject, setOrderToReject] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -83,12 +88,13 @@ const Orders = ({ token, searchQuery }) => {
     }
   }, [orders, location, navigate]);
 
-  const handleStatusUpdate = async (orderId, newStatus) => {
+  const handleStatusUpdate = async (orderId, newStatus, note = '') => {
     try {
       setUpdatingId(orderId);
       const response = await axios.post(`${backendUrl}/api/seller/orders/status`, {
         orderId,
-        status: newStatus
+        status: newStatus,
+        note
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -119,7 +125,8 @@ const Orders = ({ token, searchQuery }) => {
   });
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6 animate-fade-in">
+    <>
+      <div className="p-8 max-w-7xl mx-auto space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Seller Order Management</h1>
@@ -203,16 +210,25 @@ const Orders = ({ token, searchQuery }) => {
                      } else {
                          const nextStatus = SELLER_STATUSES[currentIdx + 1];
                          return (
-                            <>
-                               <span className="text-xs font-bold text-slate-500">Next Step:</span>
+                            <div className="flex gap-2">
+                               <span className="text-xs font-bold text-slate-500 self-center hidden sm:inline">Action:</span>
                                <button
                                  onClick={() => handleStatusUpdate(order._id, nextStatus)}
                                  disabled={updatingId === order._id}
                                  className="px-4 py-1.5 bg-black hover:bg-slate-800 text-white border border-transparent rounded-xl text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
                                >
-                                 {updatingId === order._id ? 'Updating...' : `Mark as ${nextStatus}`}
+                                 {updatingId === order._id ? '...' : `Mark ${nextStatus}`}
                                </button>
-                            </>
+                               {order.status === 'Packing' && (
+                                  <button
+                                    onClick={() => { setOrderToReject(order._id); setRejectModalOpen(true); setRejectReason(''); }}
+                                    disabled={updatingId === order._id}
+                                    className="px-4 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                                  >
+                                    Reject
+                                  </button>
+                               )}
+                            </div>
                          );
                      }
                   })()}
@@ -276,6 +292,7 @@ const Orders = ({ token, searchQuery }) => {
           ))}
         </div>
       )}
+      </div>
 
       {/* Order Details Drawer / Modal */}
       {selectedOrder && (
@@ -324,7 +341,66 @@ const Orders = ({ token, searchQuery }) => {
           </div>
         </div>
       )}
-    </div>
+
+      {/* Reject Order Modal */}
+      {rejectModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-[60] animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <h3 className="text-lg font-extrabold text-rose-600">Reject Order</h3>
+              <button onClick={() => setRejectModalOpen(false)} className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 transition-all">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-2">Why are you rejecting this order?</label>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {['Stock not available', 'Product expired', 'Damaged inventory', 'Price incorrectly listed'].map(reason => (
+                  <button
+                    key={reason}
+                    onClick={() => setRejectReason(reason)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                      rejectReason === reason ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Or type a custom reason..."
+                className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none resize-none h-24"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <button
+                onClick={() => setRejectModalOpen(false)}
+                className="py-2.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!rejectReason) {
+                    toast.error("Please provide a rejection reason.");
+                    return;
+                  }
+                  handleStatusUpdate(orderToReject, 'Cancelled', `Rejected by Seller: ${rejectReason}`);
+                  setRejectModalOpen(false);
+                }}
+                className="py-2.5 px-5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95"
+              >
+                Confirm Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

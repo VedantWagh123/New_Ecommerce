@@ -24,7 +24,11 @@ import {
     getEarnings,
     requestPayout,
     getSellerReviews,
-    deleteSelfAccount
+    deleteSelfAccount,
+    getReturns,
+    approveReturn,
+    rejectReturn,
+    updateReturnQC
 } from '../controllers/sellerController.js';
 
 const sellerRouter = express.Router();
@@ -68,5 +72,13 @@ import { onboardRazorpayAccount } from '../controllers/sellerPaymentController.j
 sellerRouter.post('/onboard-razorpay', sellerAuth, onboardRazorpayAccount);
 
 sellerRouter.get('/reviews', sellerAuth, getSellerReviews);
+
+// -------------------------------------------------------------
+// Returns & QC
+// -------------------------------------------------------------
+sellerRouter.get('/return/list', sellerAuth, getReturns);
+sellerRouter.post('/return/approve', sellerAuth, approveReturn);
+sellerRouter.post('/return/reject', sellerAuth, rejectReturn);
+sellerRouter.post('/return/qc', sellerAuth, updateReturnQC);
 
 export default sellerRouter;

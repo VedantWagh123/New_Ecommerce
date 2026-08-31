@@ -18,7 +18,8 @@ import {
   ChevronDown,
   ChevronRight,
   FolderKanban,
-  Briefcase
+  Briefcase,
+  Undo2
 } from 'lucide-react';
 
 const Sidebar = ({ setToken, storeInfo }) => {
@@ -48,6 +49,7 @@ const Sidebar = ({ setToken, storeInfo }) => {
       icon: Briefcase,
       children: [
         { path: '/orders', label: 'Orders', icon: ShoppingBag },
+        { path: '/returns', label: 'Returns', icon: Undo2 },
         { path: '/reviews', label: 'Reviews', icon: Star },
         { path: '/earnings', label: 'Earnings/Payouts', icon: Wallet }
       ]

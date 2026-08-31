@@ -18,6 +18,15 @@ const OrderDetailsModal = ({ isOpen, onClose, order, currency = '$', onRefresh }
         mode: 'add'
     });
 
+    // Action Modal State (for Cancel & Return)
+    const [actionModal, setActionModal] = useState({
+        isOpen: false,
+        type: '', // 'cancel' or 'return'
+        reason: '',
+        isAutoCancel: false,
+        isSubmitting: false
+    });
+
     if (!isOpen || !order) return null;
 
     const {
@@ -30,6 +39,7 @@ const OrderDetailsModal = ({ isOpen, onClose, order, currency = '$', onRefresh }
         paymentMethod = 'COD',
         payment = false,
         date = Date.now(),
+        updatedAt = Date.now(),
     } = order;
 
     // Use Order Placed as the first step instead of Packing for customer UI
@@ -80,31 +90,63 @@ const OrderDetailsModal = ({ isOpen, onClose, order, currency = '$', onRefresh }
         return historyItem ? historyItem.timestamp : null;
     };
 
-    const handleCancelRequest = async (isAutoCancel) => {
+    const handleCancelRequest = (isAutoCancel) => {
+        setActionModal({
+            isOpen: true,
+            type: 'cancel',
+            reason: '',
+            isAutoCancel,
+            isSubmitting: false
+        });
+    };
+
+    const handleReturnRequest = () => {
+        setActionModal({
+            isOpen: true,
+            type: 'return',
+            reason: '',
+            isAutoCancel: false,
+            isSubmitting: false
+        });
+    };
+
+    const submitActionRequest = async () => {
+        const { type, reason, isAutoCancel } = actionModal;
+        
+        if (!reason.trim()) {
+            toast.error("Please provide a reason.");
+            return;
+        }
+
+        setActionModal(prev => ({ ...prev, isSubmitting: true }));
+
         try {
-            const reason = window.prompt("Please enter a reason for cancellation (optional):");
-            if (reason === null) return; // User cancelled the prompt
+            const endpoint = type === 'cancel' ? '/api/order/cancel/request' : '/api/order/return/request';
+            const payload = type === 'cancel' ? { orderId: _id, reason } : { orderId: _id, reason, images: [] };
 
             const response = await axios.post(
-                backendUrl + '/api/order/cancel/request',
-                { orderId: _id, reason },
+                backendUrl + endpoint,
+                payload,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
             if (response.data.success) {
                 toast.success(response.data.message);
                 if (onRefresh) onRefresh();
-                if (isAutoCancel) onClose();
+                if (type === 'cancel' && isAutoCancel) onClose();
+                setActionModal({ isOpen: false, type: '', reason: '', isAutoCancel: false, isSubmitting: false });
             } else {
                 toast.error(response.data.message);
+                setActionModal(prev => ({ ...prev, isSubmitting: false }));
             }
         } catch (error) {
             console.error(error);
             toast.error(error.response?.data?.message || error.message);
+            setActionModal(prev => ({ ...prev, isSubmitting: false }));
         }
     };
 
-    // Calculate elapsed time
+    // Calculate elapsed time for cancellation
     const orderAgeHours = (Date.now() - date) / (1000 * 60 * 60);
     const canCancelAuto = orderAgeHours <= 24;
     const canCancelRequest = orderAgeHours > 24 && orderAgeHours <= 48;
@@ -114,11 +156,19 @@ const OrderDetailsModal = ({ isOpen, onClose, order, currency = '$', onRefresh }
     const beyondCancellation = ['Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Cancelled', 'Returned'];
     const isBeyondCancellation = beyondCancellation.includes(status);
 
+    // Calculate elapsed time for return window (7 days after delivery)
+    let deliveredDate = updatedAt || date; // fallback
+    const deliveredHistory = statusHistory.find(h => h.status === 'Delivered');
+    if (deliveredHistory) deliveredDate = deliveredHistory.timestamp;
+
+    const returnAgeDays = (Date.now() - deliveredDate) / (1000 * 60 * 60 * 24);
+    const isReturnEligible = status === 'Delivered' && returnAgeDays <= 7 && (order.returnStatus === 'None' || !order.returnStatus);
+
     return (
         <>
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
             <div 
-                className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-gray-100 my-auto"
+                className="bg-white rounded-2xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-gray-100 relative"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Modal Header */}
@@ -173,7 +223,6 @@ const OrderDetailsModal = ({ isOpen, onClose, order, currency = '$', onRefresh }
                 {/* Modal Scrollable Body */}
                 <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-white space-y-8">
                     
-                    {/* Visual Timeline Stepper */}
                     <section>
                         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-6">Delivery Timeline</h3>
                         {isCancelled ? (
@@ -183,7 +232,9 @@ const OrderDetailsModal = ({ isOpen, onClose, order, currency = '$', onRefresh }
                                 </div>
                                 <div>
                                     <p className="text-sm font-bold text-rose-800">This order has been cancelled.</p>
-                                    {order.cancelReason && <p className="text-xs text-rose-600 mt-1">Reason: {order.cancelReason}</p>}
+                                    {(order.cancelReason || order.statusHistory?.find(h => h.status === 'Cancelled')?.note) && (
+                                        <p className="text-xs text-rose-600 mt-1">Reason: {order.cancelReason || order.statusHistory?.find(h => h.status === 'Cancelled')?.note}</p>
+                                    )}
                                     <p className="text-xs text-gray-500 mt-2">
                                         Cancelled at: {new Date(order.updatedAt || Date.now()).toLocaleString()}
                                     </p>
@@ -317,13 +368,13 @@ const OrderDetailsModal = ({ isOpen, onClose, order, currency = '$', onRefresh }
                                         {paymentMethod === 'COD' ? (
                                             <div className="flex flex-col items-end gap-1.5">
                                                 <span className="text-xs font-bold text-gray-900">COD Amount: {currency}{amount.toFixed(2)}</span>
-                                                <span className={`text-[10px] font-bold px-2 py-1 rounded ${payment ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                                                    Payment Status: {payment ? 'Collected' : 'Pending'}
+                                                <span className={`text-[10px] font-bold px-2 py-1 rounded ${status === ORDER_STATUS.CANCELLED ? 'bg-gray-100 text-gray-600' : payment ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                    Payment Status: {status === ORDER_STATUS.CANCELLED ? 'Cancelled' : payment ? 'Collected' : 'Pending'}
                                                 </span>
                                             </div>
                                         ) : (
-                                            <span className={`text-xs font-bold px-2 py-1 rounded mt-0.5 ${payment ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                                                {payment ? 'Paid' : 'Pending'}
+                                            <span className={`text-xs font-bold px-2 py-1 rounded mt-0.5 ${status === ORDER_STATUS.CANCELLED && !payment ? 'bg-gray-100 text-gray-600' : payment ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                {status === ORDER_STATUS.CANCELLED && !payment ? 'Cancelled' : payment ? 'Paid' : 'Pending'}
                                             </span>
                                         )}
                                     </div>
@@ -433,6 +484,86 @@ const OrderDetailsModal = ({ isOpen, onClose, order, currency = '$', onRefresh }
                                     ) : null}
                                 </div>
                             )}
+
+                            {/* Return Section */}
+                            {status === 'Delivered' && (
+                                <div className="border border-gray-100 rounded-xl p-5 bg-white shadow-sm mt-6">
+                                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Returns & Refunds</h3>
+                                    
+                                    {order.returnStatus === 'Requested' ? (
+                                        <div className="p-4 bg-amber-50 rounded-lg border border-amber-100 flex items-start gap-3">
+                                            <span className="text-amber-500 text-xl">⏳</span>
+                                            <div>
+                                                <p className="text-sm font-bold text-amber-900">Return Requested</p>
+                                                <p className="text-xs text-amber-700 mt-1">Your return request is waiting for seller approval.</p>
+                                            </div>
+                                        </div>
+                                    ) : order.returnStatus === 'Approved' ? (
+                                        <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-100 flex items-start gap-3">
+                                            <span className="text-emerald-500 text-xl">🚚</span>
+                                            <div>
+                                                <p className="text-sm font-bold text-emerald-900">Return Approved</p>
+                                                <p className="text-xs text-emerald-700 mt-1">A delivery partner will be assigned for reverse pickup soon.</p>
+                                            </div>
+                                        </div>
+                                    ) : order.returnStatus === 'Rejected' ? (
+                                        <div className="p-4 bg-rose-50 rounded-lg border border-rose-100 flex items-start gap-3">
+                                            <span className="text-rose-500 text-xl">✕</span>
+                                            <div>
+                                                <p className="text-sm font-bold text-rose-900">Return Rejected</p>
+                                                <p className="text-xs text-rose-700 mt-1">Your request to return this order was declined by the seller.</p>
+                                            </div>
+                                        </div>
+                                    ) : order.returnStatus === 'In Transit' ? (
+                                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 flex items-start gap-3">
+                                            <span className="text-blue-500 text-xl">📦</span>
+                                            <div>
+                                                <p className="text-sm font-bold text-blue-900">Return In Transit</p>
+                                                <p className="text-xs text-blue-700 mt-1">Your returned item is on its way back to the seller.</p>
+                                            </div>
+                                        </div>
+                                    ) : order.returnStatus === 'Received' || order.refundStatus === 'Pending' ? (
+                                        <div className="p-4 bg-amber-50 rounded-lg border border-amber-100 flex items-start gap-3">
+                                            <span className="text-amber-500 text-xl">🛡️</span>
+                                            <div>
+                                                <p className="text-sm font-bold text-amber-900">QC Passed</p>
+                                                <p className="text-xs text-amber-700 mt-1">Quality check passed. Your refund is being processed.</p>
+                                            </div>
+                                        </div>
+                                    ) : order.refundStatus === 'Completed' ? (
+                                        <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-100 flex items-start gap-3">
+                                            <span className="text-emerald-500 text-xl">💸</span>
+                                            <div>
+                                                <p className="text-sm font-bold text-emerald-900">Refund Completed</p>
+                                                <p className="text-xs text-emerald-700 mt-1">Refund of {currency}{order.refundAmount} has been processed.</p>
+                                            </div>
+                                        </div>
+                                    ) : order.returnStatus === 'QC Failed' ? (
+                                        <div className="p-4 bg-rose-50 rounded-lg border border-rose-100 flex items-start gap-3">
+                                            <span className="text-rose-500 text-xl">⚠️</span>
+                                            <div>
+                                                <p className="text-sm font-bold text-rose-900">Quality Check Failed</p>
+                                                <p className="text-xs text-rose-700 mt-1">The returned item failed quality inspection. Refund denied.</p>
+                                            </div>
+                                        </div>
+                                    ) : isReturnEligible ? (
+                                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                                            <p className="text-sm font-bold text-gray-900 mb-1">Not satisfied with your product?</p>
+                                            <p className="text-xs text-gray-500 mb-4">You have 7 days from delivery to request a return or exchange.</p>
+                                            <button 
+                                                onClick={handleReturnRequest}
+                                                className="w-full py-2.5 bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg text-sm font-bold transition-colors shadow-sm"
+                                            >
+                                                Request Return
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-100 text-center">
+                                            <p className="text-sm font-bold text-gray-500">Return window has expired (7 days passed).</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </section>
                     </div>
                 </div>
@@ -450,6 +581,78 @@ const OrderDetailsModal = ({ isOpen, onClose, order, currency = '$', onRefresh }
             token={token}
             onReviewSubmitted={onRefresh}
         />
+
+        {/* Action Request Modal (Cancel / Return) */}
+        {actionModal.isOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-bold text-gray-900">
+                            {actionModal.type === 'cancel' ? 'Cancel Order' : 'Return Request'}
+                        </h3>
+                        <button 
+                            onClick={() => setActionModal({ isOpen: false, type: '', reason: '', isAutoCancel: false, isSubmitting: false })}
+                            className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 transition-colors"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                    
+                    <p className="text-sm text-gray-600 mb-4">
+                        {actionModal.type === 'cancel' 
+                            ? "Please tell us why you are cancelling this order." 
+                            : "Please let us know the reason for returning the item(s)."}
+                    </p>
+
+                    <div className="flex flex-wrap gap-2 mb-3">
+                        {(actionModal.type === 'cancel' 
+                            ? ['Changed my mind', 'Expected delivery too late', 'Found a better price elsewhere', 'Ordered by mistake'] 
+                            : ['Item is defective/damaged', 'Wrong item received', 'Size does not fit', 'Quality is not as expected']
+                        ).map(reason => (
+                            <button
+                                key={reason}
+                                onClick={() => setActionModal(prev => ({ ...prev, reason }))}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                                    actionModal.reason === reason ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                }`}
+                            >
+                                {reason}
+                            </button>
+                        ))}
+                    </div>
+
+                    <textarea
+                        value={actionModal.reason}
+                        onChange={(e) => setActionModal(prev => ({ ...prev, reason: e.target.value }))}
+                        placeholder="Or type a custom reason..."
+                        className="w-full border border-gray-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none resize-none h-24 mb-5"
+                    />
+
+                    <div className="flex gap-3 justify-end">
+                        <button 
+                            onClick={() => setActionModal({ isOpen: false, type: '', reason: '', isAutoCancel: false, isSubmitting: false })}
+                            className="px-5 py-2.5 rounded-xl font-bold text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+                        >
+                            Close
+                        </button>
+                        <button 
+                            onClick={submitActionRequest}
+                            disabled={actionModal.isSubmitting || !actionModal.reason.trim()}
+                            className="px-5 py-2.5 rounded-xl font-bold text-sm bg-black hover:bg-gray-800 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+                        >
+                            {actionModal.isSubmitting ? (
+                                <>
+                                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                    Submitting...
+                                </>
+                            ) : (
+                                'Submit Request'
+                            )}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
         </>
     );
 };

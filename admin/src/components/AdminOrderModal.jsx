@@ -268,8 +268,11 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
                                     <div className="w-full border border-gray-200 bg-gray-50 rounded-xl p-2.5 text-xs font-bold text-gray-500 text-center uppercase tracking-wider">
                                         Pending Seller Acceptance
                                     </div>
-                                ) : status === 'Ready for Pickup' || status === 'Assigned' ? (
+                                ) : status === 'Ready for Pickup' || status === 'Assigned' || order.returnStatus === 'Approved' ? (
                                     <div className="space-y-2">
+                                        {order.returnStatus === 'Approved' && (
+                                            <p className="text-[10px] text-amber-600 font-bold mb-1">Assign Wishmaster for Reverse Pickup</p>
+                                        )}
                                         <select
                                             value={selectedPartnerId || order.deliveryPartnerId || ''}
                                             onChange={(e) => setSelectedPartnerId(e.target.value)}

@@ -165,6 +165,30 @@ const Orders = ({ token, searchQuery }) => {
     }
   };
 
+  const handleReturnAction = async (orderId, action) => {
+    try {
+      setUpdatingId(orderId);
+      const endpoint = action === 'pickup' ? '/api/delivery/return/pickup' : '/api/delivery/return/deliver';
+      
+      const response = await axios.post(`${backendUrl}${endpoint}`, {
+        orderId
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        toast.success(response.data.message);
+        fetchOrders();
+      } else {
+        toast.error(response.data.message);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const filteredOrders = orders.filter(order => {
     if (order.status === 'Assigned') return false; 
     const matchesSearch = !searchQuery ||
@@ -210,6 +234,41 @@ const Orders = ({ token, searchQuery }) => {
                 <Icon className="w-4 h-4" />
               </div>
               <span className={`text-[10px] font-bold ${isActive ? 'text-indigo-900' : 'text-slate-400'}`}>{step.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const ReturnTimeline = ({ currentStatus }) => {
+    const steps = [
+      { key: 'Approved', label: 'Assigned', icon: Package },
+      { key: 'In Transit', label: 'Transit', icon: Truck },
+      { key: 'Received', label: 'Delivered', icon: CheckCircle2 }
+    ];
+    
+    const statuses = ['Approved', 'In Transit', 'Received', 'QC Failed'];
+    const currentIndex = Math.max(0, statuses.indexOf(currentStatus));
+
+    return (
+      <div className="flex items-center justify-between mt-6 pt-6 border-t border-slate-100 relative max-w-sm mx-auto">
+        <div className="absolute top-[45px] left-8 right-8 h-1 bg-slate-100 rounded-full -z-10"></div>
+        <div className="absolute top-[45px] left-8 h-1 bg-rose-500 rounded-full -z-10 transition-all duration-500" style={{ width: `calc(${(currentIndex / (steps.length - 1)) * 100}% - 2rem)` }}></div>
+
+        {steps.map((step, idx) => {
+          const isActive = idx <= currentIndex;
+          const isCurrent = idx === currentIndex;
+          const Icon = step.icon;
+          
+          return (
+            <div key={step.key} className="flex flex-col items-center gap-2 relative">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
+                isActive ? 'bg-rose-600 border-rose-600 text-white shadow-md' : 'bg-white border-slate-200 text-slate-400'
+              } ${isCurrent ? 'ring-4 ring-rose-100 scale-110' : ''}`}>
+                <Icon className="w-4 h-4" />
+              </div>
+              <span className={`text-[10px] font-bold ${isActive ? 'text-rose-900' : 'text-slate-400'}`}>{step.label}</span>
             </div>
           );
         })}
@@ -269,11 +328,17 @@ const Orders = ({ token, searchQuery }) => {
                       <Clock className="w-3.5 h-3.5" />
                       {new Date(order.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                      order.payment ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {order.paymentMethod} • {order.payment ? 'Paid' : 'Unpaid COD'}
-                    </span>
+                    {['Approved', 'In Transit', 'Received', 'QC Failed'].includes(order.returnStatus) ? (
+                      <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200">
+                        Reverse Pickup
+                      </span>
+                    ) : (
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        order.payment ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {order.paymentMethod} • {order.payment ? 'Paid' : 'Unpaid COD'}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -283,6 +348,25 @@ const Orders = ({ token, searchQuery }) => {
                      <span className="text-xs font-bold text-rose-600 bg-rose-50 px-4 py-2 rounded-xl border border-rose-200">
                         Cancel Requested
                      </span>
+                  ) : ['Approved', 'In Transit', 'Received', 'QC Failed'].includes(order.returnStatus) ? (
+                     <div className="flex w-full lg:w-auto items-center gap-3 bg-rose-50 p-2 rounded-2xl border border-rose-100">
+                       <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider pl-2">Return Action:</span>
+                       {order.returnStatus === 'Approved' && (
+                          <button onClick={() => handleReturnAction(order._id, 'pickup')} disabled={updatingId === order._id} className="flex-1 lg:flex-none px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 flex items-center gap-2">
+                            <Package className="w-4 h-4"/> Pick Up Return
+                          </button>
+                       )}
+                       {order.returnStatus === 'In Transit' && (
+                          <button onClick={() => handleReturnAction(order._id, 'deliver')} disabled={updatingId === order._id} className="flex-1 lg:flex-none px-5 py-2.5 bg-rose-900 hover:bg-rose-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4"/> Deliver to Seller
+                          </button>
+                       )}
+                       {['Received', 'QC Failed'].includes(order.returnStatus) && (
+                          <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 flex items-center gap-1">
+                            <CheckCircle2 className="w-4 h-4"/> Return Delivered
+                          </span>
+                       )}
+                     </div>
                   ) : (() => {
                      const DELIVERY_STATUSES = ['Accepted (Delivery)', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered'];
                      const currentIdx = DELIVERY_STATUSES.indexOf(order.status);
@@ -401,9 +485,11 @@ const Orders = ({ token, searchQuery }) => {
               </div>
 
               {/* Active Timeline */}
-              {['Accepted (Delivery)', 'Picked Up', 'In Transit', 'Out for Delivery'].includes(order.status) && (
+              {['Approved', 'In Transit'].includes(order.returnStatus) ? (
+                 <ReturnTimeline currentStatus={order.returnStatus} />
+              ) : ['Accepted (Delivery)', 'Picked Up', 'In Transit', 'Out for Delivery'].includes(order.status) && order.returnStatus === 'None' ? (
                 <Timeline currentStatus={order.status} />
-              )}
+              ) : null}
             </div>
           ))}
         </div>

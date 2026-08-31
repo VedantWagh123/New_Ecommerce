@@ -883,8 +883,12 @@ const assignWishmaster = async (req, res) => {
             return res.json({ success: false, message: 'Order not found' });
         }
 
-        if (order.status !== 'Ready for Pickup' && order.status !== 'Assigned') {
-            return res.json({ success: false, message: `Cannot assign Wishmaster. Order status is ${order.status}` });
+        if (
+            order.status !== 'Ready for Pickup' && 
+            order.status !== 'Assigned' && 
+            order.returnStatus !== 'Approved'
+        ) {
+            return res.json({ success: false, message: `Cannot assign Wishmaster. Current status is ${order.status}, Return Status: ${order.returnStatus}` });
         }
 
         const partner = await userModel.findOne({ _id: partnerId, isDeliveryPartner: true });
@@ -894,14 +898,23 @@ const assignWishmaster = async (req, res) => {
 
         const now = Date.now();
         const history = order.statusHistory || [];
+        
+        // Differentiate note based on whether it's a delivery or a return pickup
+        const isReturn = order.returnStatus === 'Approved';
+        
         history.push({
             status: 'Assigned',
             timestamp: now,
             updatedBy: 'Admin',
-            note: `Order assigned to Wishmaster: ${partner.name}`
+            note: isReturn ? `Reverse pickup assigned to Wishmaster: ${partner.name}` : `Order assigned to Wishmaster: ${partner.name}`
         });
 
-        order.status = 'Assigned';
+        if (!isReturn) {
+            order.status = 'Assigned';
+        }
+        // If it is a return, we leave the main status as Delivered, and only track returnStatus.
+        // Actually, we don't need to change returnStatus here, it stays 'Approved' until the Wishmaster picks it up (then it becomes 'In Transit').
+
         order.deliveryPartnerId = partnerId;
         order.statusHistory = history;
         order.updatedAt = now;
@@ -909,7 +922,12 @@ const assignWishmaster = async (req, res) => {
         await order.save();
 
         // Notification to Delivery Partner
-        await sendNotification('delivery', partnerId, 'New Delivery Assigned', `You have been assigned to deliver Order #${order._id.toString().slice(-8).toUpperCase()}`, order._id);
+        const notifTitle = isReturn ? 'Reverse Pickup Assigned' : 'New Delivery Assigned';
+        const notifBody = isReturn 
+            ? `You have been assigned a reverse pickup for Order #${order._id.toString().slice(-8).toUpperCase()}` 
+            : `You have been assigned to deliver Order #${order._id.toString().slice(-8).toUpperCase()}`;
+
+        await sendNotification('delivery', partnerId, notifTitle, notifBody, order._id);
         
         emitOrderUpdate(order);
 
@@ -920,4 +938,114 @@ const assignWishmaster = async (req, res) => {
     }
 };
 
-export {verifyRazorpay, verifyStripe ,placeOrder, placeOrderStripe, placeOrderRazorpay, allOrders, userOrders, updateStatus, deleteOrder, getAdminAnalytics, requestCancellation, approveCancellation, rejectCancellation, assignWishmaster}
+// ------------------------------------------------------------------
+// RETURN & REFUND WORKFLOW
+// ------------------------------------------------------------------
+
+const requestReturn = async (req, res) => {
+    try {
+        const { orderId, reason, images } = req.body;
+        const userId = req.userId; // auth middleware
+
+        const order = await orderModel.findOne({ _id: orderId, userId });
+        if (!order) {
+            return res.json({ success: false, message: 'Order not found' });
+        }
+
+        if (order.status !== 'Delivered') {
+            return res.json({ success: false, message: 'Only delivered orders can be returned.' });
+        }
+
+        if (order.returnStatus !== 'None') {
+            return res.json({ success: false, message: 'Return already requested for this order.' });
+        }
+
+        // Check 7 day window
+        const now = Date.now();
+        // The order delivery date should be used, but since we don't have a strict deliveryDate field,
+        // we check statusHistory for 'Delivered' timestamp, or fallback to updatedAT
+        let deliveredDate = order.updatedAt;
+        const deliveredHistory = (order.statusHistory || []).find(h => h.status === 'Delivered');
+        if (deliveredHistory) deliveredDate = deliveredHistory.timestamp;
+
+        const ageDays = (now - deliveredDate) / (1000 * 60 * 60 * 24);
+        if (ageDays > 7) {
+            return res.json({ success: false, message: 'Return window (7 days) has expired.' });
+        }
+
+        const history = order.statusHistory || [];
+        history.push({
+            status: 'Return Requested',
+            timestamp: now,
+            updatedBy: 'Customer',
+            note: `Return requested. Reason: ${reason}`
+        });
+
+        order.returnStatus = 'Requested';
+        order.returnReason = reason || '';
+        order.returnImages = images || [];
+        order.returnDate = now;
+        order.statusHistory = history;
+        order.updatedAt = now;
+
+        await order.save();
+
+        // Notify Admin and Seller
+        await sendNotification('admin', null, 'Return Requested', `Order #${order._id.toString().slice(-8).toUpperCase()} has a new return request.`, order._id);
+        
+        emitOrderUpdate(order);
+
+        res.json({ success: true, message: 'Return request submitted successfully.' });
+
+    } catch (error) {
+        console.error("Return Request Error:", error);
+        res.json({ success: false, message: error.message });
+    }
+};
+
+const processRefund = async (req, res) => {
+    try {
+        const { orderId } = req.body;
+        
+        const order = await orderModel.findById(orderId);
+        if (!order) {
+            return res.json({ success: false, message: 'Order not found' });
+        }
+
+        if (order.refundStatus !== 'Pending') {
+            return res.json({ success: false, message: 'Refund is not in Pending state.' });
+        }
+
+        // In a real app, integrate Stripe/Razorpay refund API here.
+        // For COD, admin processes it manually or adds to Wallet.
+        
+        const now = Date.now();
+        const history = order.statusHistory || [];
+        history.push({
+            status: 'Refund Completed',
+            timestamp: now,
+            updatedBy: 'Admin',
+            note: `Refund of ${order.amount} processed successfully.`
+        });
+
+        order.refundStatus = 'Completed';
+        order.refundAmount = order.amount;
+        order.status = 'Returned'; // Final state of order
+        order.statusHistory = history;
+        order.updatedAt = now;
+
+        await order.save();
+
+        await sendNotification('user', order.userId, 'Refund Completed', `Your refund of ${order.amount} for Order #${order._id.toString().slice(-8).toUpperCase()} is completed.`, order._id);
+        
+        emitOrderUpdate(order);
+
+        res.json({ success: true, message: 'Refund processed successfully.' });
+
+    } catch (error) {
+        console.error("Process Refund Error:", error);
+        res.json({ success: false, message: error.message });
+    }
+};
+
+export {verifyRazorpay, verifyStripe ,placeOrder, placeOrderStripe, placeOrderRazorpay, allOrders, userOrders, updateStatus, deleteOrder, getAdminAnalytics, requestCancellation, approveCancellation, rejectCancellation, assignWishmaster, requestReturn, processRefund}

@@ -1,5 +1,5 @@
 import express from 'express'
-import {placeOrder, placeOrderStripe, placeOrderRazorpay, allOrders, userOrders, updateStatus, deleteOrder, verifyStripe, verifyRazorpay, getAdminAnalytics, requestCancellation, approveCancellation, rejectCancellation, assignWishmaster} from '../controllers/orderController.js'
+import {placeOrder, placeOrderStripe, placeOrderRazorpay, allOrders, userOrders, updateStatus, deleteOrder, verifyStripe, verifyRazorpay, getAdminAnalytics, requestCancellation, approveCancellation, rejectCancellation, assignWishmaster, requestReturn, processRefund} from '../controllers/orderController.js'
 import adminAuth  from '../middleware/adminAuth.js'
 import roleAuth from '../middleware/roleAuth.js'
 import authUser from '../middleware/auth.js'
@@ -29,5 +29,9 @@ orderRouter.post('/verifyRazorpay',authUser, verifyRazorpay)
 orderRouter.post('/cancel/request', authUser, requestCancellation)
 orderRouter.post('/cancel/approve', adminAuth, roleAuth(['super_admin', 'support']), approveCancellation)
 orderRouter.post('/cancel/reject', adminAuth, roleAuth(['super_admin', 'support']), rejectCancellation)
+
+// Return & Refund Features
+orderRouter.post('/return/request', authUser, requestReturn)
+orderRouter.post('/refund/process', adminAuth, roleAuth(['super_admin', 'support', 'finance']), processRefund)
 
 export default orderRouter
