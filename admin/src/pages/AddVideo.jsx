@@ -35,13 +35,26 @@ const AddVideo = ({ token }) => {
     const handleVideoChange = (e) => {
         const file = e.target.files[0];
         if (file) {
-            // Check size (e.g. max 50MB)
             if (file.size > 50 * 1024 * 1024) {
                 toast.error("Video file is too large. Maximum size is 50MB.");
                 return;
             }
-            setVideo(file);
-            setPreviewUrl(URL.createObjectURL(file));
+
+            const video = document.createElement('video');
+            video.preload = 'metadata';
+            video.onloadedmetadata = function() {
+                window.URL.revokeObjectURL(video.src);
+                if (video.duration > 40) {
+                    toast.error("Video is too long! Maximum allowed duration is 40 seconds.");
+                    e.target.value = '';
+                    setVideo(null);
+                    setPreviewUrl('');
+                } else {
+                    setVideo(file);
+                    setPreviewUrl(URL.createObjectURL(file));
+                }
+            };
+            video.src = URL.createObjectURL(file);
         }
     };
 

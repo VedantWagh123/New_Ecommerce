@@ -438,12 +438,21 @@ const addSellerProduct = async (req, res) => {
             }
         }
 
+        let parsedCategory = [];
+        if (category) {
+            try {
+                parsedCategory = typeof category === 'string' ? JSON.parse(category) : category;
+            } catch (e) {
+                parsedCategory = typeof category === 'string' ? [category] : [];
+            }
+        }
+
         const productData = {
             name,
             description,
             price: Number(price),
             discount: discount ? Number(discount) : 0,
-            category,
+            category: parsedCategory,
             subCategory,
             sizes: parsedSizes,
             colors: parsedColors,
@@ -497,12 +506,21 @@ const editSellerProduct = async (req, res) => {
             description: description || product.description,
             price: price !== undefined ? Number(price) : product.price,
             discount: discount !== undefined ? Number(discount) : product.discount,
-            category: category || product.category,
             subCategory: subCategory || product.subCategory,
             material: material !== undefined ? material : product.material,
             bestseller: bestseller !== undefined ? (bestseller === "true" || bestseller === true) : product.bestseller,
             approvalStatus: product.approvalStatus || 'approved'
         };
+
+        if (category) {
+            try {
+                updateData.category = typeof category === 'string' ? JSON.parse(category) : category;
+            } catch (e) {
+                updateData.category = typeof category === 'string' ? [category] : [];
+            }
+        } else {
+            updateData.category = product.category;
+        }
 
         if (sizes) {
             updateData.sizes = typeof sizes === 'string' ? JSON.parse(sizes) : sizes;

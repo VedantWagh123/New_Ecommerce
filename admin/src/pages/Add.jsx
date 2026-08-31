@@ -14,7 +14,7 @@ const Add = ({token}) => {
    const [name, setName] = useState("");
    const [description, setDescription] = useState("");
    const [price, setPrice] = useState("");
-   const [category, setCategory] = useState("Men");
+   const [category, setCategory] = useState(["Men"]);
    const [subCategory, setSubCategory] = useState("Topwear");
    const [bestseller, setBestseller] = useState(false);
    const [isFeatured, setIsFeatured] = useState(false);
@@ -22,25 +22,25 @@ const Add = ({token}) => {
    const [cashOnDelivery, setCashOnDelivery] = useState(true);
    const [sizes, setSizes] = useState(["S", "M", "L"]);
 
-   const getCategorySizes = (cat) => {
-     if (cat === 'Jewellery' || cat === 'Accessories' || cat === 'Fashion Essentials') {
-       return ['Free Size', 'One Size', 'Adjustable', 'Ring 6', 'Ring 7', 'Ring 8', 'Ring 9', 'Ring 10'];
-     }
-     if (cat === 'Footwear') {
-       return ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11'];
-     }
-     return ['S', 'M', 'L', 'XL', 'XXL'];
+   const ALL_CATEGORIES = ['Men', 'Women', 'Kids', 'Footwear', 'Accessories', 'Jewellery', 'Winterwear', 'Sportswear', 'Ethnic Wear', 'Fashion Essentials'];
+
+   const getCategorySizes = (cats) => {
+     let allSizes = new Set();
+     if (!cats || cats.length === 0) return ['S', 'M', 'L', 'XL', 'XXL'];
+     cats.forEach(cat => {
+       if (cat === 'Jewellery' || cat === 'Accessories' || cat === 'Fashion Essentials') {
+         ['Free Size', 'One Size', 'Adjustable', 'Ring 6', 'Ring 7', 'Ring 8', 'Ring 9', 'Ring 10'].forEach(s => allSizes.add(s));
+       } else if (cat === 'Footwear') {
+         ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11'].forEach(s => allSizes.add(s));
+       } else {
+         ['S', 'M', 'L', 'XL', 'XXL'].forEach(s => allSizes.add(s));
+       }
+     });
+     return Array.from(allSizes);
    };
 
-   const handleCategoryChange = (newCat) => {
-     setCategory(newCat);
-     if (newCat === 'Jewellery' || newCat === 'Accessories' || newCat === 'Fashion Essentials') {
-       setSizes(['Free Size']);
-     } else if (newCat === 'Footwear') {
-       setSizes(['UK 7', 'UK 8', 'UK 9']);
-     } else {
-       setSizes(['S', 'M', 'L']);
-     }
+   const toggleCategory = (cat) => {
+     setCategory(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
    };
 
    const onSubmitHandler = async (e) => {
@@ -53,7 +53,7 @@ const Add = ({token}) => {
       formData.append("name",name)
       formData.append("description",description)
       formData.append("price",price)
-      formData.append("category",category)
+      formData.append("category",JSON.stringify(category))
       formData.append("subCategory",subCategory)
       formData.append("bestseller",bestseller)
       formData.append("isFeatured",isFeatured)
@@ -126,20 +126,17 @@ const Add = ({token}) => {
 
         <div className='flex flex-col sm:flex-row gap-2 w-full sm:gap-8'>
 
-            <div>
-              <p className='mb-2'>Product category</p>
-              <select onChange={(e) => handleCategoryChange(e.target.value)} value={category} className='w-full px-3 py-2 border rounded'>
-                  <option value="Men">Men</option>
-                  <option value="Women">Women</option>
-                  <option value="Kids">Kids</option>
-                  <option value="Footwear">Footwear</option>
-                  <option value="Accessories">Accessories</option>
-                  <option value="Jewellery">Jewellery</option>
-                  <option value="Winterwear">Winterwear</option>
-                  <option value="Sportswear">Sportswear</option>
-                  <option value="Ethnic Wear">Ethnic Wear</option>
-                  <option value="Fashion Essentials">Fashion Essentials</option>
-              </select>
+            <div className='w-full sm:w-1/2'>
+              <p className='mb-2'>Product category (Select multiple)</p>
+              <div className='flex flex-wrap gap-2'>
+                {ALL_CATEGORIES.map(cat => (
+                  <div key={cat} onClick={() => toggleCategory(cat)}>
+                    <p className={`${category.includes(cat) ? "bg-indigo-100 border-indigo-400 font-bold" : "bg-slate-50 border-slate-200" } px-3 py-1 cursor-pointer rounded border text-xs`}>
+                      {cat}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div>

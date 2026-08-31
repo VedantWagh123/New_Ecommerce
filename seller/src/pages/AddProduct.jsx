@@ -17,8 +17,10 @@ const AddProduct = ({ token }) => {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [discount, setDiscount] = useState('0');
-  const [category, setCategory] = useState('Women');
+  const [category, setCategory] = useState(['Women']);
   const [subCategory, setSubCategory] = useState('Topwear');
+
+  const ALL_CATEGORIES = ['Men', 'Women', 'Kids', 'Footwear', 'Accessories', 'Jewellery', 'Winterwear', 'Sportswear', 'Ethnic Wear', 'Fashion Essentials'];
   const [material, setMaterial] = useState('');
   const [colors, setColors] = useState('');
   const [bestseller, setBestseller] = useState(false);
@@ -29,21 +31,27 @@ const AddProduct = ({ token }) => {
 
   const [loading, setLoading] = useState(false);
 
-  const getCategorySizes = (cat, subCat) => {
-    if (['Jewellery', 'Accessories', 'Fashion Essentials'].includes(cat) || ['Jewellery', 'Accessories', 'Fashion Essentials'].includes(subCat)) {
-      return ['Free Size', 'One Size', 'Adjustable', 'Ring 6', 'Ring 7', 'Ring 8', 'Ring 9', 'Ring 10'];
-    }
-    if (cat === 'Footwear' || subCat === 'Footwear') {
-      return ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11'];
-    }
-    return ['S', 'M', 'L', 'XL', 'XXL'];
+  const getCategorySizes = (cats, subCat) => {
+    let allSizes = new Set();
+    if (!cats || cats.length === 0) return ['S', 'M', 'L', 'XL', 'XXL'];
+    cats.forEach(cat => {
+      if (['Jewellery', 'Accessories', 'Fashion Essentials'].includes(cat) || ['Jewellery', 'Accessories', 'Fashion Essentials'].includes(subCat)) {
+        ['Free Size', 'One Size', 'Adjustable', 'Ring 6', 'Ring 7', 'Ring 8', 'Ring 9', 'Ring 10'].forEach(s => allSizes.add(s));
+      } else if (cat === 'Footwear' || subCat === 'Footwear') {
+        ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11'].forEach(s => allSizes.add(s));
+      } else {
+        ['S', 'M', 'L', 'XL', 'XXL'].forEach(s => allSizes.add(s));
+      }
+    });
+    return Array.from(allSizes);
   };
 
-  const updateSizesBasedOnCat = (cat, subCat) => {
-    if (['Jewellery', 'Accessories', 'Fashion Essentials'].includes(cat) || ['Jewellery', 'Accessories', 'Fashion Essentials'].includes(subCat)) {
+  const updateSizesBasedOnCat = (cats, subCat) => {
+    const validSizes = getCategorySizes(cats, subCat);
+    if (validSizes.includes('Free Size') && !validSizes.includes('S')) {
       setSizes(['Free Size']);
       setStockMap({ 'Free Size': 10 });
-    } else if (cat === 'Footwear' || subCat === 'Footwear') {
+    } else if (validSizes.includes('UK 7') && !validSizes.includes('S')) {
       setSizes(['UK 7', 'UK 8', 'UK 9']);
       setStockMap({ 'UK 7': 10, 'UK 8': 10, 'UK 9': 10 });
     } else {
@@ -52,9 +60,12 @@ const AddProduct = ({ token }) => {
     }
   };
 
-  const handleCategoryChange = (newCat) => {
-    setCategory(newCat);
-    updateSizesBasedOnCat(newCat, subCategory);
+  const toggleCategory = (cat) => {
+    setCategory(prev => {
+      const newCats = prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat];
+      updateSizesBasedOnCat(newCats, subCategory);
+      return newCats;
+    });
   };
 
   const handleSubCategoryChange = (newSubCat) => {
@@ -106,7 +117,7 @@ const AddProduct = ({ token }) => {
       formData.append('description', description);
       formData.append('price', price);
       formData.append('discount', discount);
-      formData.append('category', category);
+      formData.append('category', JSON.stringify(category));
       formData.append('subCategory', subCategory);
       formData.append('material', material);
       formData.append('bestseller', bestseller);
@@ -225,24 +236,28 @@ const AddProduct = ({ token }) => {
             ></textarea>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Category</label>
-            <select
-              value={category}
-              onChange={(e) => handleCategoryChange(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-slate-900"
-            >
-              <option value="Men">Men</option>
-              <option value="Women">Women</option>
-              <option value="Kids">Kids</option>
-              <option value="Footwear">Footwear</option>
-              <option value="Accessories">Accessories</option>
-              <option value="Jewellery">Jewellery</option>
-              <option value="Winterwear">Winterwear</option>
-              <option value="Sportswear">Sportswear</option>
-              <option value="Ethnic Wear">Ethnic Wear</option>
-              <option value="Fashion Essentials">Fashion Essentials</option>
-            </select>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-bold text-slate-700 mb-2">Category (Select multiple)</label>
+            <div className="flex flex-wrap gap-2">
+              {ALL_CATEGORIES.map(cat => {
+                const selected = category.includes(cat);
+                return (
+                  <button
+                    type="button"
+                    key={cat}
+                    onClick={() => toggleCategory(cat)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center justify-center gap-1 cursor-pointer ${
+                      selected
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+                    }`}
+                  >
+                    {selected && <Check className="w-3 h-3" />}
+                    <span>{cat}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div>
@@ -320,9 +335,9 @@ const AddProduct = ({ token }) => {
               Available Sizes / Options
             </label>
             <span className="text-[11px] text-indigo-600 font-semibold">
-              {['Jewellery', 'Accessories', 'Fashion Essentials'].includes(category) || ['Jewellery', 'Accessories', 'Fashion Essentials'].includes(subCategory)
+              {(category.some(c => ['Jewellery', 'Accessories', 'Fashion Essentials'].includes(c))) || ['Jewellery', 'Accessories', 'Fashion Essentials'].includes(subCategory)
                 ? '✨ Defaulted to Free Size / Adjustable' 
-                : (category === 'Footwear' || subCategory === 'Footwear') ? '👟 Shoe Size Matrix' : '👕 Apparel Sizes'}
+                : (category.includes('Footwear') || subCategory === 'Footwear') ? '👟 Shoe Size Matrix' : '👕 Apparel Sizes'}
             </span>
           </div>
 

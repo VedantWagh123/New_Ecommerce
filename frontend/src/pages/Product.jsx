@@ -133,7 +133,7 @@ const Product = () => {
 
   const fetchBankOffers = async (cat) => {
     try {
-      const categoryParam = cat || productData?.category || '';
+      const categoryParam = cat || (Array.isArray(productData?.category) ? productData?.category[0] : productData?.category) || '';
       const res = await axios.get(`${backendUrl}/api/bank-offer/list?productId=${productId}&category=${categoryParam}`);
       if (res.data.success) {
         setBankOffers(res.data.offers || []);
@@ -615,7 +615,7 @@ const Product = () => {
                   <span className="font-bold text-gray-900">{productData.brand || 'Forever Fashion'}</span>
                   
                   <span className="text-gray-500 font-medium">Category:</span>
-                  <span className="font-bold text-gray-900">{productData.category}</span>
+                  <span className="font-bold text-gray-900">{Array.isArray(productData.category) ? productData.category.join(', ') : productData.category}</span>
                   
                   <span className="text-gray-500 font-medium">Type / SubCategory:</span>
                   <span className="font-bold text-gray-900">{productData.subCategory}</span>

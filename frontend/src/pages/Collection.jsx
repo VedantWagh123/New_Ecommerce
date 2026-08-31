@@ -69,14 +69,20 @@ const Collection = () => {
     // Category filter (Strict category matching so Men, Women, & Kids sections stay 100% separated)
     if (category.length > 0) {
       productsCopy = productsCopy.filter(item => {
-        const itemCat = (item.category || '').trim().toLowerCase();
+        let itemCats = [];
+        if (Array.isArray(item.category)) {
+          itemCats = item.category.map(c => (c || '').trim().toLowerCase());
+        } else if (typeof item.category === 'string') {
+          itemCats = [(item.category || '').trim().toLowerCase()];
+        }
+
         const itemSub = (item.subCategory || '').trim().toLowerCase();
 
         return category.some(cat => {
           const selectedCat = cat.trim().toLowerCase();
 
           // 1. Exact Category or SubCategory match
-          if (itemCat === selectedCat || itemSub === selectedCat) {
+          if (itemCats.includes(selectedCat) || itemSub === selectedCat) {
             return true;
           }
 

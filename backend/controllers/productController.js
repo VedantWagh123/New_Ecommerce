@@ -53,10 +53,19 @@ const addProduct = async (req, res) => {
             })
         )
 
+        let parsedCategory = [];
+        if (category) {
+            try {
+                parsedCategory = typeof category === 'string' ? JSON.parse(category) : category;
+            } catch (e) {
+                parsedCategory = typeof category === 'string' ? [category] : [];
+            }
+        }
+
         const productData = {
             name,
             description,
-            category,
+            category: parsedCategory,
             price: Number(price),
             subCategory,
             bestseller: bestseller === "true" ? true : false,
