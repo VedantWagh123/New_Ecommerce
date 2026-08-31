@@ -28,7 +28,14 @@ const OLLAMA_VISION_MODEL = process.env.OLLAMA_VISION_MODEL || 'llava:latest';
 
 // Helper to safely call Ollama API with configurable timeout
 const callOllama = async (endpoint, data, timeoutMs = Number(process.env.OLLAMA_TIMEOUT) || 5000) => {
-  return await axios.post(`${OLLAMA_HOST}${endpoint}`, data, { timeout: timeoutMs });
+  return await axios.post(`${OLLAMA_HOST}${endpoint}`, data, { 
+    timeout: timeoutMs,
+    headers: {
+      'Bypass-Tunnel-Reminder': 'true',
+      'ngrok-skip-browser-warning': 'true',
+      'User-Agent': 'Veloura-AI-Backend/1.0'
+    }
+  });
 };
 
 // Helper to safely extract user ID from JWT token or request body
