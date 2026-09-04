@@ -100,7 +100,9 @@ const PlaceOrder = () => {
         }
     }
 
-    const isCartEmpty = totalItemsCount === 0;
+    // productsLoaded: true only after backend API returns (products array populated OR no cart items exist)
+    const productsLoaded = products.length > 0 || Object.keys(cartItems).length === 0;
+    const isCartEmpty = productsLoaded && totalItemsCount === 0;
 
     const initPay = (order) => {
         const options = {
@@ -251,6 +253,19 @@ const PlaceOrder = () => {
         }
     };
 
+    // Show loading spinner while products are still being fetched from backend
+    if (!productsLoaded && !showSuccessModal) {
+        return (
+            <div className="border-t pt-14 pb-20 min-h-[65vh] flex flex-col items-center justify-center">
+                <svg className="animate-spin h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <p className="mt-4 text-sm text-gray-400 font-medium">Loading your order details...</p>
+            </div>
+        );
+    }
+
     if (isCartEmpty && !showSuccessModal) {
         return (
             <div className="border-t pt-14 pb-20 min-h-[65vh] flex flex-col items-center justify-center text-center px-4">
@@ -309,7 +324,7 @@ const PlaceOrder = () => {
                             onChange={onChangeHandler}
                             name="firstName"
                             value={formData.firstName}
-                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                             type="text"
                             placeholder="First name *"
                         />
@@ -317,7 +332,7 @@ const PlaceOrder = () => {
                             onChange={onChangeHandler}
                             name="lastName"
                             value={formData.lastName}
-                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                             type="text"
                             placeholder="Last name"
                         />
@@ -329,7 +344,7 @@ const PlaceOrder = () => {
                             onChange={onChangeHandler}
                             name="phone"
                             value={formData.phone}
-                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                             type="tel"
                             placeholder="Mobile Number *"
                         />
@@ -337,7 +352,7 @@ const PlaceOrder = () => {
                             onChange={onChangeHandler}
                             name="email"
                             value={formData.email}
-                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all bg-gray-50 text-gray-500"
+                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all bg-gray-50"
                             type="email"
                             placeholder="Email address"
                         />
@@ -349,7 +364,7 @@ const PlaceOrder = () => {
                             onChange={onChangeHandler}
                             name="pincode"
                             value={formData.pincode}
-                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                             type="text"
                             maxLength={6}
                             placeholder="Pincode *"
@@ -359,7 +374,7 @@ const PlaceOrder = () => {
                             onChange={onChangeHandler}
                             name="street"
                             value={formData.street}
-                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                             type="text"
                             placeholder="Locality / Area *"
                         />
@@ -370,7 +385,7 @@ const PlaceOrder = () => {
                         onChange={onChangeHandler}
                         name="houseNo"
                         value={formData.houseNo}
-                        className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                        className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                         type="text"
                         placeholder="House No., Building, Flat *"
                     />
@@ -379,7 +394,7 @@ const PlaceOrder = () => {
                         onChange={onChangeHandler}
                         name="landmark"
                         value={formData.landmark}
-                        className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                        className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                         type="text"
                         placeholder="Landmark (Optional)"
                     />
@@ -390,7 +405,7 @@ const PlaceOrder = () => {
                             onChange={onChangeHandler}
                             name="city"
                             value={formData.city}
-                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                             type="text"
                             placeholder="City / District *"
                         />
@@ -399,7 +414,7 @@ const PlaceOrder = () => {
                             onChange={onChangeHandler}
                             name="state"
                             value={formData.state}
-                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                            className="border border-gray-300 rounded-lg py-2.5 px-4 w-full text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                             type="text"
                             placeholder="State *"
                         />

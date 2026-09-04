@@ -19,8 +19,10 @@ import {
   ScanLine
 } from 'lucide-react';
 import { SocketContext } from '../context/SocketContext';
+import { formatDateTimeIST, formatFullIST } from '../utils/formatIST';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-const currency = '$';
+const currency = '₹';
 
 const Orders = ({ token, searchQuery }) => {
   const [orders, setOrders] = useState([]);
@@ -32,6 +34,9 @@ const Orders = ({ token, searchQuery }) => {
   const [showOtpPrompt, setShowOtpPrompt] = useState({ orderId: null, action: null });
   const [showCodPrompt, setShowCodPrompt] = useState(null); 
   const [showScanner, setShowScanner] = useState(false);
+
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const handleUpiPayment = (orderId) => {
     setShowScanner(true);
@@ -85,6 +90,18 @@ const Orders = ({ token, searchQuery }) => {
       };
     }
   }, [socket]);
+
+  // Open specific order from notification click
+  useEffect(() => {
+    if (orders.length > 0 && location.state?.openOrderId) {
+      const targetOrder = orders.find(o => o._id === location.state.openOrderId);
+      if (targetOrder) {
+        setSelectedOrder(targetOrder);
+        // Clear the state so it doesn't reopen on page refresh
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    }
+  }, [orders, location, navigate]);
 
   const handleOtpSubmit = async (orderId, action) => {
     if (!otpInput) {
@@ -326,7 +343,7 @@ const Orders = ({ token, searchQuery }) => {
                     </span>
                     <span className="text-xs text-slate-400 font-bold flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5" />
-                      {new Date(order.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {formatDateTimeIST(order.date)}
                     </span>
                     {['Approved', 'In Transit', 'Received', 'QC Failed'].includes(order.returnStatus) ? (
                       <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200">
@@ -636,7 +653,7 @@ const Orders = ({ token, searchQuery }) => {
                       <p className="font-bold text-slate-900">{step.status}</p>
                       <p className="text-xs font-medium text-slate-500 mt-0.5">{step.note}</p>
                       <span className="text-[10px] font-bold text-slate-400 mt-2 block uppercase tracking-wider">
-                        {new Date(step.timestamp).toLocaleString()} &bull; {step.updatedBy}
+                        {formatFullIST(step.timestamp)} &bull; {step.updatedBy}
                       </span>
                     </div>
                   </div>

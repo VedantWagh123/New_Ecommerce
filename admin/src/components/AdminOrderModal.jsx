@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ALL_STATUSES, STATUS_STEPS, getStatusStepIndex, getStatusBadgeStyle } from '../utils/orderStatus';
 
-const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdate, onDeleteOrder, wishmasters = [], onAssignWishmaster }) => {
+const AdminOrderModal = ({ isOpen, onClose, order, currency = '₹', onStatusUpdate, onDeleteOrder, wishmasters = [], onAssignWishmaster }) => {
     if (!isOpen || !order) return null;
 
     const {
@@ -13,7 +13,8 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
         statusHistory = [],
         paymentMethod = 'COD',
         payment = false,
-        date = Date.now()
+        date = Date.now(),
+        assignedWarehouse
     } = order;
 
     const [selectedStatus, setSelectedStatus] = useState(status);
@@ -58,6 +59,21 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
             setIsUpdating(false);
         }
     };
+
+    // Case-insensitive city → warehouse mapping
+    const getCityWarehouse = (city = '') => {
+        const c = city.trim().toLowerCase();
+        if (c.includes('nagpur')) return 'WH_NAGPUR';
+        if (c.includes('wardha')) return 'WH_WARDHA';
+        if (c.includes('dhamangaon') || c.includes('dhamangoan')) return 'WH_DHAMANGAON';
+        return city.trim(); // fallback: use raw value
+    };
+
+    const filteredWishmasters = wishmasters.filter(partner => {
+        if (!assignedWarehouse) return true; // no hub set → show all
+        const partnerWH = getCityWarehouse(partner.serviceCity);
+        return partnerWH === assignedWarehouse;
+    });
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-gray-900/20 animate-fade-in overflow-y-auto print:absolute print:inset-auto print:bg-white print:p-0 print:overflow-visible print:h-auto print:block">
@@ -155,6 +171,11 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
                             <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusBadgeStyle(status)}`}>
                                 {status}
                             </span>
+                            {assignedWarehouse && (
+                                <span className="px-3 py-1 rounded-full text-[10px] font-bold border bg-purple-50 text-purple-700 border-purple-200 uppercase tracking-widest flex items-center gap-1">
+                                    📍 {assignedWarehouse.replace('WH_', '')} HUB
+                                </span>
+                            )}
                         </div>
                         <p className="text-xs text-gray-500 mt-1 font-medium">
                             Placed on {new Date(date).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
@@ -264,11 +285,35 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
                         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                             <div className="sm:col-span-5">
                                 <label className="text-xs text-gray-500 block mb-1 font-semibold">Target Status</label>
-                                {['Packing', 'Accepted'].includes(status) ? (
-                                    <div className="w-full border border-gray-200 bg-gray-50 rounded-xl p-2.5 text-xs font-bold text-gray-500 text-center uppercase tracking-wider">
-                                        Pending Seller Acceptance
+                                {status === 'Packing' ? (
+                                    <div className="space-y-2">
+                                        <div className="w-full border border-blue-200 bg-blue-50 rounded-xl p-2.5 text-xs font-bold text-blue-700 text-center uppercase tracking-wider">
+                                            New Order Received
+                                        </div>
+                                        <button
+                                            type="button"
+                                            disabled={isUpdating}
+                                            onClick={() => onStatusUpdate(_id, 'Packed', note)}
+                                            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+                                        >
+                                            {isUpdating ? 'Updating...' : 'Pack Order'}
+                                        </button>
                                     </div>
-                                ) : status === 'Ready for Pickup' || status === 'Assigned' || order.returnStatus === 'Approved' ? (
+                                ) : status === 'Packed' ? (
+                                    <div className="space-y-2">
+                                        <div className="w-full border border-purple-200 bg-purple-50 rounded-xl p-2.5 text-xs font-bold text-purple-700 text-center uppercase tracking-wider">
+                                            Order is Packed
+                                        </div>
+                                        <button
+                                            type="button"
+                                            disabled={isUpdating}
+                                            onClick={() => onStatusUpdate(_id, 'Ready for Pickup', note)}
+                                            className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+                                        >
+                                            {isUpdating ? 'Updating...' : 'Mark Ready for Dispatch'}
+                                        </button>
+                                    </div>
+                                ) : status === 'Ready for Pickup' || order.returnStatus === 'Approved' ? (
                                     <div className="space-y-2">
                                         {order.returnStatus === 'Approved' && (
                                             <p className="text-[10px] text-amber-600 font-bold mb-1">Assign Wishmaster for Reverse Pickup</p>
@@ -279,7 +324,7 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
                                             className="w-full border border-gray-300 rounded-xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-black bg-white cursor-pointer"
                                         >
                                             <option value="" disabled>Select Wishmaster to Assign...</option>
-                                            {wishmasters.map(partner => (
+                                            {filteredWishmasters.map(partner => (
                                                 <option key={partner._id} value={partner._id} disabled={!partner.isDeliveryOnline}>
                                                     {partner.name} - {partner.deliveryVehicle} ({partner.serviceCity}) - {partner.isDeliveryOnline ? '🟢 Online' : '🔴 Offline'}
                                                 </option>
@@ -311,21 +356,9 @@ const AdminOrderModal = ({ isOpen, onClose, order, currency = '$', onStatusUpdat
                                         </div>
                                     </div>
                                 ) : (
-                                    <select
-                                        value={selectedStatus}
-                                        onChange={(e) => setSelectedStatus(e.target.value)}
-                                        disabled={order.cancelStatus === 'Requested'}
-                                        className="w-full border border-gray-300 rounded-xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-black bg-white cursor-pointer disabled:opacity-50"
-                                    >
-                                        <option value={status}>{status}</option>
-                                        {['Packed', 'Ready for Pickup', 'Assigned', 'Accepted (Delivery)', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled']
-                                          .slice(['Packed', 'Ready for Pickup', 'Assigned', 'Accepted (Delivery)', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled'].indexOf(status) + 1)
-                                          .map((st) => (
-                                            <option key={st} value={st}>
-                                                {st}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <div className="w-full border border-gray-200 bg-gray-50 rounded-xl p-2.5 text-xs font-bold text-gray-500 text-center uppercase tracking-wider">
+                                        Status: {status}
+                                    </div>
                                 )}
                                 {order.cancelStatus === 'Requested' && (
                                     <p className="text-[10px] text-rose-600 font-bold mt-1">Pending cancellation request.</p>

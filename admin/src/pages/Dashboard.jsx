@@ -142,21 +142,11 @@ const Dashboard = ({ token }) => {
 
   // Daily / Timeline Sales Trend Graph Data
   const salesTrendData = useMemo(() => {
-    if (!orders.length) {
-      // Fallback empty preview structure for crisp graphics
-      return [
-        { date: 'Mon', revenue: 450, orders: 4 },
-        { date: 'Tue', revenue: 890, orders: 8 },
-        { date: 'Wed', revenue: 620, orders: 5 },
-        { date: 'Thu', revenue: 1200, orders: 12 },
-        { date: 'Fri', revenue: 950, orders: 9 },
-        { date: 'Sat', revenue: 1500, orders: 15 },
-        { date: 'Sun', revenue: 1800, orders: 18 },
-      ];
+    if (!filteredOrders.length) {
+      return [{ date: 'No Data', revenue: 0, orders: 0 }];
     }
 
     const dateMap = {};
-    // Group orders by formatted date String
     filteredOrders.forEach(o => {
       if (o.status === 'Cancelled' || o.status === 'Delivery Failed') return;
       const dateStr = new Date(o.date || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -168,12 +158,10 @@ const Dashboard = ({ token }) => {
     });
 
     const result = Object.values(dateMap).sort((a, b) => a.timestamp - b.timestamp);
-    if (result.length === 1) {
-      // Add padding entry for smooth curve preview
-      return [{ date: 'Start', revenue: 0, orders: 0 }, ...result];
-    }
-    return result.length ? result : [{ date: 'Today', revenue: metrics.totalRevenue, orders: metrics.totalOrdersCount }];
-  }, [filteredOrders, orders.length, metrics]);
+    if (result.length === 0) return [{ date: 'Today', revenue: 0, orders: 0 }];
+    if (result.length === 1) return [{ date: 'Start', revenue: 0, orders: 0 }, ...result];
+    return result;
+  }, [filteredOrders]);
 
   // Order Status Distribution Chart Data
   const orderStatusData = useMemo(() => {
@@ -190,12 +178,7 @@ const Dashboard = ({ token }) => {
     }));
 
     if (!data.length) {
-      return [
-        { name: 'Delivered', value: 12, color: STATUS_COLORS['Delivered'] },
-        { name: 'Packing', value: 5, color: STATUS_COLORS['Packing'] },
-        { name: 'Shipped', value: 4, color: STATUS_COLORS['Shipped'] },
-        { name: 'Cancelled', value: 1, color: STATUS_COLORS['Cancelled'] }
-      ];
+      return [{ name: 'No Orders', value: 1, color: '#e2e8f0' }];
     }
     return data;
   }, [filteredOrders]);
@@ -214,11 +197,7 @@ const Dashboard = ({ token }) => {
     }));
 
     if (!data.length) {
-      return [
-        { category: 'Men', count: 18 },
-        { category: 'Women', count: 24 },
-        { category: 'Kids', count: 12 }
-      ];
+      return [];
     }
     return data;
   }, [products]);
@@ -246,9 +225,9 @@ const Dashboard = ({ token }) => {
   return (
     <div className='w-full pb-16 space-y-8 animate-fade-in'>
       {/* Header Banner */}
-      <div className='bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-pink-500/10 backdrop-blur-2xl text-slate-900 p-6 sm:p-8 rounded-3xl border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden'>
-        <div className='absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none' />
-        <div className='absolute left-1/3 bottom-0 w-48 h-48 bg-pink-500/10 rounded-full blur-2xl pointer-events-none' />
+      <div className='bg-gradient-to-br from-indigo-50 to-pink-50 text-slate-900 p-6 sm:p-8 rounded-3xl border border-indigo-100 shadow-sm relative overflow-hidden'>
+        <div className='absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-indigo-500/10 rounded-full pointer-events-none' />
+        <div className='absolute left-1/3 bottom-0 w-48 h-48 bg-pink-500/10 rounded-full pointer-events-none' />
 
         <div className='relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6'>
           <div>
@@ -307,7 +286,7 @@ const Dashboard = ({ token }) => {
       {/* KPI Cards Grid */}
       <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5'>
         {/* Total Revenue */}
-        <div className='bg-white/60 backdrop-blur-xl p-6 rounded-3xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(99,102,241,0.1)] transition-all group relative overflow-hidden'>
+        <div className='bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm transition-all group relative overflow-hidden'>
           <div className='flex items-center justify-between'>
             <span className='text-xs font-extrabold uppercase tracking-wider text-slate-500'>Total Sales Revenue</span>
             <div className='w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform'>
@@ -326,7 +305,7 @@ const Dashboard = ({ token }) => {
         </div>
 
         {/* Total Orders */}
-        <div className='bg-white/60 backdrop-blur-xl p-6 rounded-3xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(99,102,241,0.1)] transition-all group relative overflow-hidden'>
+        <div className='bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm transition-all group relative overflow-hidden'>
           <div className='flex items-center justify-between'>
             <span className='text-xs font-extrabold uppercase tracking-wider text-slate-500'>Total Orders</span>
             <div className='w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform'>
@@ -346,7 +325,7 @@ const Dashboard = ({ token }) => {
         </div>
 
         {/* Product Catalog */}
-        <div className='bg-white/60 backdrop-blur-xl p-6 rounded-3xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(99,102,241,0.1)] transition-all group relative overflow-hidden'>
+        <div className='bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm transition-all group relative overflow-hidden'>
           <div className='flex items-center justify-between'>
             <span className='text-xs font-extrabold uppercase tracking-wider text-slate-500'>Live Products</span>
             <div className='w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform'>
@@ -365,7 +344,7 @@ const Dashboard = ({ token }) => {
         </div>
 
         {/* Sellers & Approvals */}
-        <div className='bg-white/60 backdrop-blur-xl p-6 rounded-3xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(99,102,241,0.1)] transition-all group relative overflow-hidden'>
+        <div className='bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm transition-all group relative overflow-hidden'>
           <div className='flex items-center justify-between'>
             <span className='text-xs font-extrabold uppercase tracking-wider text-slate-500'>Sellers & Approvals</span>
             <div className='w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform'>
@@ -390,7 +369,7 @@ const Dashboard = ({ token }) => {
       {/* Main Visual Graphs Grid */}
       <div className='grid grid-cols-1 lg:grid-cols-12 gap-8'>
         {/* Sales & Revenue Trend Area Chart */}
-        <div className='lg:col-span-8 bg-white/60 backdrop-blur-xl p-6 rounded-3xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-4'>
+        <div className='lg:col-span-8 bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4'>
           <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4'>
             <div>
               <h3 className='text-lg font-bold text-slate-900 flex items-center gap-2'>
@@ -446,7 +425,7 @@ const Dashboard = ({ token }) => {
         </div>
 
         {/* Order Status Distribution Donut Chart */}
-        <div className='lg:col-span-4 bg-white/60 backdrop-blur-xl p-6 rounded-3xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-4 flex flex-col justify-between'>
+        <div className='lg:col-span-4 bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4 flex flex-col justify-between'>
           <div>
             <h3 className='text-lg font-bold text-slate-900 flex items-center gap-2'>
               <Clock className='w-5 h-5 text-blue-600' />
@@ -505,7 +484,7 @@ const Dashboard = ({ token }) => {
       {/* Secondary Graphs: Category Breakdown & Payment Methods */}
       <div className='grid grid-cols-1 lg:grid-cols-12 gap-8'>
         {/* Category Breakdown Bar Chart */}
-        <div className='lg:col-span-7 bg-white/60 backdrop-blur-xl p-6 rounded-3xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-4'>
+        <div className='lg:col-span-7 bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4'>
           <div>
             <h3 className='text-lg font-bold text-slate-900 flex items-center gap-2'>
               <Package className='w-5 h-5 text-purple-600' />
@@ -539,7 +518,7 @@ const Dashboard = ({ token }) => {
         </div>
 
         {/* Payment Methods */}
-        <div className='lg:col-span-5 bg-white/60 backdrop-blur-xl p-6 rounded-3xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-4 flex flex-col justify-between'>
+        <div className='lg:col-span-5 bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4 flex flex-col justify-between'>
           <div>
             <h3 className='text-lg font-bold text-slate-900 flex items-center gap-2'>
               <CreditCard className='w-5 h-5 text-emerald-600' />
@@ -586,7 +565,7 @@ const Dashboard = ({ token }) => {
       {/* Quick Action Hub & Recent Activity Feed */}
       <div className='grid grid-cols-1 lg:grid-cols-12 gap-8'>
         {/* Recent Orders Live Feed */}
-        <div className='lg:col-span-8 bg-white/60 backdrop-blur-xl p-6 rounded-3xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-4'>
+        <div className='lg:col-span-8 bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4'>
           <div className='flex items-center justify-between border-b border-slate-100 pb-4'>
             <div>
               <h3 className='text-lg font-bold text-slate-900'>Recent Store Orders</h3>

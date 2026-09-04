@@ -12,12 +12,14 @@ import {
   ChevronRight, 
   Eye, 
   X,
-  CreditCard
+  CreditCard,
+  AlertTriangle,
+  PackageX
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SocketContext } from '../context/SocketContext';
 
-const currency = '$';
+const currency = '₹';
 
 const Orders = ({ token, searchQuery }) => {
   const [orders, setOrders] = useState([]);
@@ -25,6 +27,7 @@ const Orders = ({ token, searchQuery }) => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
+  const [inventoryMap, setInventoryMap] = useState({}); // productId -> { totalStock, stockMap }
   
   // Reject Modal State
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -39,14 +42,32 @@ const Orders = ({ token, searchQuery }) => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${backendUrl}/api/seller/orders`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const [ordersRes, inventoryRes] = await Promise.all([
+        axios.get(`${backendUrl}/api/seller/orders`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${backendUrl}/api/seller/inventory`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
 
-      if (response.data.success) {
-        setOrders(response.data.orders);
+      if (ordersRes.data.success) {
+        setOrders(ordersRes.data.orders);
       } else {
-        toast.error(response.data.message);
+        toast.error(ordersRes.data.message);
+      }
+
+      if (inventoryRes.data.success) {
+        // Build a map: productId -> { totalStock, stockMap, name }
+        const map = {};
+        inventoryRes.data.inventory.forEach(item => {
+          map[item._id] = {
+            totalStock: item.totalStock,
+            stockMap: item.stock || {},
+            name: item.name
+          };
+        });
+        setInventoryMap(map);
       }
     } catch (error) {
       console.error(error);
@@ -113,6 +134,22 @@ const Orders = ({ token, searchQuery }) => {
     } finally {
       setUpdatingId(null);
     }
+  };
+
+  // Check stock alerts for an order's items
+  const getStockAlerts = (orderItems) => {
+    const alerts = [];
+    orderItems?.forEach(item => {
+      const inv = inventoryMap[item._id] || inventoryMap[item.productId];
+      if (!inv) return;
+      const sizeStock = inv.stockMap?.[item.size] ?? inv.totalStock;
+      if (sizeStock === 0) {
+        alerts.push({ name: item.name, size: item.size, level: 'out', stock: sizeStock });
+      } else if (sizeStock <= 5) {
+        alerts.push({ name: item.name, size: item.size, level: 'low', stock: sizeStock });
+      }
+    });
+    return alerts;
   };
 
   const filteredOrders = orders.filter(order => {
@@ -249,25 +286,99 @@ const Orders = ({ token, searchQuery }) => {
                 <div className="md:col-span-2 space-y-3">
                   <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">Ordered Products</p>
                   <div className="space-y-2">
-                    {order.items?.map((item, idx) => (
-                      <div key={idx} className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                        <img
-                          src={item.image?.[0] || item.image || 'https://via.placeholder.com/60'}
-                          alt={item.name}
-                          className="w-12 h-14 object-cover rounded-lg border border-slate-200 flex-shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-xs font-bold text-slate-900 truncate">{item.name}</h4>
-                          <p className="text-[11px] text-slate-500 mt-0.5">
-                            Size: <strong className="text-slate-800">{item.size || 'M'}</strong> &bull; Qty: <strong className="text-slate-800">{item.quantity}</strong>
-                          </p>
+                    {order.items?.map((item, idx) => {
+                      // Per-item stock check
+                      const inv = inventoryMap[item._id] || inventoryMap[item.productId];
+                      const sizeStock = inv ? (inv.stockMap?.[item.size] ?? inv.totalStock) : null;
+                      const isOut = inv && sizeStock === 0;
+                      const isLow = inv && sizeStock > 0 && sizeStock <= 5;
+                      return (
+                        <div key={idx} className={`flex items-center gap-3 p-2.5 rounded-xl border ${
+                          isOut ? 'bg-rose-50 border-rose-200' :
+                          isLow ? 'bg-amber-50 border-amber-200' :
+                          'bg-slate-50 border-slate-100'
+                        }`}>
+                          <img
+                            src={item.image?.[0] || item.image || 'https://via.placeholder.com/60'}
+                            alt={item.name}
+                            className={`w-12 h-14 object-cover rounded-lg border flex-shrink-0 ${
+                              isOut ? 'border-rose-300' : isLow ? 'border-amber-300' : 'border-slate-200'
+                            }`}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-xs font-bold text-slate-900 truncate">{item.name}</h4>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              Size: <strong className="text-slate-800">{item.size || 'M'}</strong> &bull; Qty: <strong className="text-slate-800">{item.quantity}</strong>
+                            </p>
+                            {/* Inline stock badge per item */}
+                            {isOut && (
+                              <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-rose-100 text-rose-700 border border-rose-300 rounded-full text-[10px] font-bold uppercase tracking-wide">
+                                <PackageX className="w-3 h-3" /> Out of Stock
+                              </span>
+                            )}
+                            {isLow && (
+                              <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-amber-100 text-amber-700 border border-amber-300 rounded-full text-[10px] font-bold uppercase tracking-wide">
+                                <AlertTriangle className="w-3 h-3" /> Low Stock ({sizeStock} left)
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-xs font-bold text-slate-900">{currency}{item.price * item.quantity}</span>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <span className="text-xs font-bold text-slate-900">{currency}{item.price * item.quantity}</span>
+                      );
+                    })}
+                  </div>
+
+                  {/* Order-level stock alert banner */}
+                  {(() => {
+                    const alerts = getStockAlerts(order.items);
+                    const hasOut = alerts.some(a => a.level === 'out');
+                    const hasLow = alerts.some(a => a.level === 'low');
+                    if (alerts.length === 0) return null;
+                    return (
+                      <div className={`flex items-start gap-3 p-3 rounded-xl border ${
+                        hasOut
+                          ? 'bg-rose-50 border-rose-200'
+                          : 'bg-amber-50 border-amber-200'
+                      }`}>
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                          hasOut ? 'bg-rose-100' : 'bg-amber-100'
+                        }`}>
+                          {hasOut
+                            ? <PackageX className="w-4 h-4 text-rose-600" />
+                            : <AlertTriangle className="w-4 h-4 text-amber-600" />}
+                        </div>
+                        <div className="flex-1">
+                          <p className={`text-xs font-bold ${
+                            hasOut ? 'text-rose-700' : 'text-amber-700'
+                          }`}>
+                            {hasOut ? '⚠️ Stock Alert: Item(s) Out of Stock' : '⚠️ Stock Alert: Low Stock Warning'}
+                          </p>
+                          <ul className={`mt-1 space-y-0.5 ${
+                            hasOut ? 'text-rose-600' : 'text-amber-600'
+                          }`}>
+                            {alerts.map((a, i) => (
+                              <li key={i} className="text-[11px] font-medium">
+                                {a.level === 'out'
+                                  ? `"${a.name}" (Size ${a.size}) — Stok khatam ho gaya. Restock karo ya order reject karo.`
+                                  : `"${a.name}" (Size ${a.size}) — Sirf ${a.stock} unit bacha hai. Jaldi restock karo.`
+                                }
+                              </li>
+                            ))}
+                          </ul>
+                          <a
+                            href="/inventory"
+                            className={`inline-block mt-2 text-[10px] font-bold underline underline-offset-2 ${
+                              hasOut ? 'text-rose-600 hover:text-rose-800' : 'text-amber-600 hover:text-amber-800'
+                            }`}
+                          >
+                            → Inventory Update Karo
+                          </a>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Shipping Info */}

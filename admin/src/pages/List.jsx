@@ -66,26 +66,37 @@ const List = ({ token }) => {
 
         {/* ------- List Table Title ---------- */}
 
-        <div className='grid grid-cols-[1fr_3fr_1fr_1fr_1fr] items-center py-1 px-2 border bg-gray-100 text-sm min-w-[600px]'>
+        <div className='grid grid-cols-[1fr_3fr_1fr_1fr_1fr_1fr] items-center py-1 px-2 border bg-gray-100 text-sm min-w-[600px]'>
           <b>Image</b>
           <b>Name</b>
           <b>Category</b>
           <b>Price</b>
+          <b>Total Stock</b>
           <b className='text-center'>Action</b>
         </div>
 
         {/* ------ Product List ------ */}
 
         {
-          list.map((item, index) => (
-            <div className='grid grid-cols-[1fr_3fr_1fr_1fr_1fr] items-center gap-2 py-1 px-2 border text-sm min-w-[600px]' key={index}>
-              <img className='w-12' src={item.image[0]} alt="" />
-              <p>{item.name}</p>
-              <p>{item.category}</p>
-              <p>{currency}{item.price}</p>
-              <p onClick={()=>removeProduct(item._id)} className='text-center cursor-pointer text-lg hover:text-red-600 font-bold'>X</p>
-            </div>
-          ))
+          list.map((item, index) => {
+            const globalStock = (item.warehouseInventory || []).reduce((total, wh) => {
+              if (wh.stockMap) {
+                return total + Object.values(wh.stockMap).reduce((sum, val) => sum + (Number(val) || 0), 0);
+              }
+              return total;
+            }, 0);
+
+            return (
+              <div className='grid grid-cols-[1fr_3fr_1fr_1fr_1fr_1fr] items-center gap-2 py-1 px-2 border text-sm min-w-[600px]' key={index}>
+                <img className='w-12' src={item.image[0]} alt="" />
+                <p>{item.name}</p>
+                <p>{item.category}</p>
+                <p>{currency}{item.price}</p>
+                <p className={`font-bold ${globalStock > 0 ? 'text-green-600' : 'text-red-500'}`}>{globalStock}</p>
+                <p onClick={()=>removeProduct(item._id)} className='text-center cursor-pointer text-lg hover:text-red-600 font-bold'>X</p>
+              </div>
+            );
+          })
         }
 
       </div>

@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { SocketContext } from '../context/SocketContext';
 
-const currency = '$';
+const currency = '₹';
 
 const Products = ({ token, searchQuery }) => {
   const [products, setProducts] = useState([]);

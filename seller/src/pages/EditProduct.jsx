@@ -22,7 +22,32 @@ const EditProduct = ({ token }) => {
   const [colors, setColors] = useState(initialProduct?.colors?.join(', ') || '');
   const [bestseller, setBestseller] = useState(initialProduct?.bestseller || false);
   const [sizes, setSizes] = useState(initialProduct?.sizes || ['S', 'M', 'L']);
-  const [stockMap, setStockMap] = useState(initialProduct?.stock || { S: 10, M: 10, L: 10 });
+  const CITIES = [
+    { id: 'WH_NAGPUR', name: 'Nagpur' },
+    { id: 'WH_WARDHA', name: 'Wardha' },
+    { id: 'WH_DHAMANGAON', name: 'Dhamangaon Rly' }
+  ];
+  
+  const initialCityMap = { WH_NAGPUR: {}, WH_WARDHA: {}, WH_DHAMANGAON: {} };
+  if (initialProduct?.warehouseInventory && initialProduct.warehouseInventory.length > 0) {
+      initialProduct.warehouseInventory.forEach(wh => {
+          if (initialCityMap[wh.warehouseId]) {
+              initialCityMap[wh.warehouseId] = { ...(wh.stockMap || {}) };
+          }
+      });
+      (initialProduct.sizes || []).forEach(sz => {
+          CITIES.forEach(c => {
+              if (initialCityMap[c.id][sz] === undefined) initialCityMap[c.id][sz] = 0;
+          });
+      });
+  } else {
+      (initialProduct?.sizes || ['S', 'M', 'L']).forEach(sz => {
+          initialCityMap.WH_NAGPUR[sz] = initialProduct?.stock?.[sz] || 0;
+          initialCityMap.WH_WARDHA[sz] = 0;
+          initialCityMap.WH_DHAMANGAON[sz] = 0;
+      });
+  }
+  const [cityStockMap, setCityStockMap] = useState(initialCityMap);
   const [customSizeInput, setCustomSizeInput] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -39,13 +64,13 @@ const EditProduct = ({ token }) => {
   const updateSizesBasedOnCat = (cat, subCat) => {
     if (['Jewellery', 'Accessories', 'Fashion Essentials'].includes(cat) || ['Jewellery', 'Accessories', 'Fashion Essentials'].includes(subCat)) {
       setSizes(['Free Size']);
-      setStockMap({ 'Free Size': 10 });
+      setCityStockMap({ WH_NAGPUR: { 'Free Size': 10 }, WH_WARDHA: { 'Free Size': 0 }, WH_DHAMANGAON: { 'Free Size': 0 } });
     } else if (cat === 'Footwear' || subCat === 'Footwear') {
       setSizes(['UK 7', 'UK 8', 'UK 9']);
-      setStockMap({ 'UK 7': 10, 'UK 8': 10, 'UK 9': 10 });
+      setCityStockMap({ WH_NAGPUR: { 'UK 7': 10, 'UK 8': 10, 'UK 9': 10 }, WH_WARDHA: { 'UK 7': 0, 'UK 8': 0, 'UK 9': 0 }, WH_DHAMANGAON: { 'UK 7': 0, 'UK 8': 0, 'UK 9': 0 } });
     } else {
       setSizes(['S', 'M', 'L']);
-      setStockMap({ S: 10, M: 10, L: 10 });
+      setCityStockMap({ WH_NAGPUR: { S: 10, M: 10, L: 10 }, WH_WARDHA: { S: 0, M: 0, L: 0 }, WH_DHAMANGAON: { S: 0, M: 0, L: 0 } });
     }
   };
 
@@ -64,9 +89,13 @@ const EditProduct = ({ token }) => {
       setSizes(sizes.filter(s => s !== size));
     } else {
       setSizes([...sizes, size]);
-      if (stockMap[size] === undefined) {
-        setStockMap(prev => ({ ...prev, [size]: 10 }));
-      }
+      setCityStockMap(prev => {
+          const newMap = { ...prev };
+          CITIES.forEach(c => {
+              if (newMap[c.id][size] === undefined) newMap[c.id][size] = c.id === 'WH_NAGPUR' ? 10 : 0;
+          });
+          return newMap;
+      });
     }
   };
 
@@ -75,13 +104,22 @@ const EditProduct = ({ token }) => {
     const val = customSizeInput.trim();
     if (!sizes.includes(val)) {
       setSizes([...sizes, val]);
-      setStockMap(prev => ({ ...prev, [val]: 10 }));
+      setCityStockMap(prev => {
+          const newMap = { ...prev };
+          CITIES.forEach(c => {
+              if (newMap[c.id][val] === undefined) newMap[c.id][val] = c.id === 'WH_NAGPUR' ? 10 : 0;
+          });
+          return newMap;
+      });
     }
     setCustomSizeInput('');
   };
 
-  const handleStockChange = (size, val) => {
-    setStockMap(prev => ({ ...prev, [size]: Number(val) }));
+  const handleStockChange = (city, size, val) => {
+    setCityStockMap(prev => ({
+        ...prev,
+        [city]: { ...prev[city], [size]: Number(val) }
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -90,9 +128,25 @@ const EditProduct = ({ token }) => {
 
     try {
       const colorsArr = colors ? colors.split(',').map(c => c.trim()).filter(Boolean) : [];
-      const finalStock = {};
-      sizes.forEach(s => {
-        finalStock[s] = stockMap[s] !== undefined ? Number(stockMap[s]) : 10;
+      
+      const legacyStock = {};
+      const newWarehouseInventory = [];
+      Object.entries(cityStockMap).forEach(([city, sizeMap]) => {
+          let cityTotal = 0;
+          const filteredSizeMap = {};
+          Object.entries(sizeMap).forEach(([sz, qty]) => {
+              if (sizes.includes(sz)) {
+                  legacyStock[sz] = (legacyStock[sz] || 0) + qty;
+                  cityTotal += qty;
+                  filteredSizeMap[sz] = qty;
+              }
+          });
+          newWarehouseInventory.push({
+              warehouseId: city,
+              stock: cityTotal,
+              stockMap: filteredSizeMap,
+              reserved: 0
+          });
       });
 
       const response = await axios.post(`${backendUrl}/api/seller/products/edit`, {
@@ -107,7 +161,8 @@ const EditProduct = ({ token }) => {
         bestseller,
         sizes,
         colors: colorsArr,
-        stock: finalStock
+        stock: JSON.stringify(legacyStock),
+        warehouseInventory: JSON.stringify(newWarehouseInventory)
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -279,21 +334,32 @@ const EditProduct = ({ token }) => {
           </div>
         </div>
 
-        {/* Variant-wise Stock */}
+        {/* Distributed Inventory by City & Size */}
         {sizes.length > 0 && (
-          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-3">
-            <h4 className="text-xs font-bold text-slate-900">Stock Count Per Size Variant</h4>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              {sizes.map(size => (
-                <div key={size}>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Size {size} Stock</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={stockMap[size] !== undefined ? stockMap[size] : 10}
-                    onChange={(e) => handleStockChange(size, e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900"
-                  />
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-4">
+            <h4 className="text-xs font-bold text-slate-900">Distributed Inventory (3-City)</h4>
+            
+            <div className="space-y-4">
+              {CITIES.map(city => (
+                <div key={city.id} className="bg-white p-3 rounded-xl border border-slate-200">
+                  <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                    {city.name} Warehouse
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {sizes.map(size => (
+                      <div key={size}>
+                        <label className="block text-[10px] font-semibold text-slate-500 mb-1">Size {size}</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={cityStockMap[city.id]?.[size] !== undefined ? cityStockMap[city.id][size] : 0}
+                          onChange={(e) => handleStockChange(city.id, size, e.target.value)}
+                          className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 focus:ring-1 focus:ring-slate-900"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>

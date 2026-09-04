@@ -29,6 +29,58 @@ const notifyOrderPlaced = async (orderId) => {
     }
 };
 
+// Helper function to auto-assign delivery boy if Auto-Pilot is ON
+const autoAssignToDeliveryBoy = async (orderId) => {
+    try {
+        console.log(`[Auto-Pilot] Triggered for order: ${orderId}`);
+        const order = await orderModel.findById(orderId);
+        if (!order) {
+            console.log(`[Auto-Pilot] Order not found in DB`);
+            return;
+        }
+        if (order.status !== "Ready for Pickup") {
+            console.log(`[Auto-Pilot] Order status is ${order.status}, not Ready for Pickup. Ignoring.`);
+            return;
+        }
+
+        const settings = await settingsModel.findOne() || {};
+        if (!settings.autoAssignDelivery) {
+            console.log(`[Auto-Pilot] settings.autoAssignDelivery is OFF. Exiting.`);
+            return;
+        }
+
+        console.log(`[Auto-Pilot] Settings are ON. Finding vedant wagh...`);
+        // Find online delivery boy specifically named "vedant wagh" (ignore city to be safe for now)
+        const availablePartner = await userModel.findOne({
+            isDeliveryPartner: true,
+            deliveryStatus: 'approved',
+            isDeliveryOnline: true,
+            name: { $regex: /vedant|vedatn/i }
+        });
+
+        if (availablePartner) {
+            console.log(`[Auto-Pilot] Found partner: ${availablePartner.name} (${availablePartner._id})`);
+            order.deliveryPartnerId = availablePartner._id;
+            order.status = 'Assigned';
+            order.statusHistory.push({
+                status: 'Assigned',
+                timestamp: Date.now(),
+                updatedBy: 'System',
+                note: `Auto-Pilot: Order automatically assigned to Wishmaster: ${availablePartner.name}`
+            });
+            await order.save();
+
+            emitOrderUpdate(order);
+            await sendNotification('delivery', availablePartner._id, 'New Auto-Assigned Order', `You have been automatically assigned Order #${order._id.toString().slice(-8).toUpperCase()}`, order._id);
+            console.log(`[Auto-Pilot] Successfully assigned!`);
+        } else {
+            console.log(`[Auto-Pilot] FAILED to find partner 'vedant wagh' who is approved and online.`);
+        }
+    } catch (error) {
+        console.error("Error in autoAssignToDeliveryBoy:", error);
+    }
+};
+
 // Helper to attach sellerId and storeName to order items from Product & User collections
 const enrichItemsWithSellerId = async (items) => {
     if (!Array.isArray(items)) return items;
@@ -59,6 +111,94 @@ const enrichItemsWithSellerId = async (items) => {
             razorpayAccountId
         };
     }));
+};
+
+// --- Routing & Reservation Engine ---
+const getAssignedWarehouse = (zipcode) => {
+    if (!zipcode) return null;
+    const zipString = String(zipcode).trim();
+    
+    if (zipString.startsWith('440')) return 'WH_NAGPUR'; // Nagpur City
+    if (zipString.startsWith('442')) return 'WH_WARDHA'; // Wardha
+    if (zipString === '444709') return 'WH_DHAMANGAON'; // Dhamangaon Railway
+    
+    return null; // Delivery not available
+};
+
+const reserveStockForOrder = async (items, assignedWarehouse) => {
+    const productsToUpdate = [];
+    
+    // 1. Verify availability
+    for (const item of items) {
+        const dbProduct = await productModel.findById(item._id || item.productId);
+        if (!dbProduct) {
+            throw new Error(`Product ${item.name} not found.`);
+        }
+        
+        // Auto-upgrade legacy products with default inventory (100 per size per warehouse)
+        if (!dbProduct.warehouseInventory || dbProduct.warehouseInventory.length === 0) {
+            const stockMap = {};
+            (dbProduct.sizes || ['S', 'M', 'L']).forEach(size => stockMap[size] = 100);
+            dbProduct.warehouseInventory = [
+                { warehouseId: 'WH_NAGPUR', stockMap: { ...stockMap }, stock: Object.keys(stockMap).length * 100 },
+                { warehouseId: 'WH_WARDHA', stockMap: { ...stockMap }, stock: Object.keys(stockMap).length * 100 },
+                { warehouseId: 'WH_DHAMANGAON', stockMap: { ...stockMap }, stock: Object.keys(stockMap).length * 100 }
+            ];
+            dbProduct.markModified('warehouseInventory');
+            await dbProduct.save();
+        }
+        
+        let hasStock = false;
+        const whInventory = dbProduct.warehouseInventory?.find(wh => wh.warehouseId === assignedWarehouse);
+        
+        if (whInventory && whInventory.stockMap && whInventory.stockMap[item.size] !== undefined) {
+            if (whInventory.stockMap[item.size] >= item.quantity) {
+                hasStock = true;
+            }
+        }
+        
+        if (!hasStock) {
+            let globalStock = 0;
+            if (dbProduct.warehouseInventory) {
+                for (const wh of dbProduct.warehouseInventory) {
+                    if (wh.stockMap && wh.stockMap[item.size]) {
+                        globalStock += wh.stockMap[item.size];
+                    }
+                }
+            }
+            
+            if (globalStock < item.quantity) {
+                throw new Error(`Item ${item.name} (Size: ${item.size}) is out of stock globally.`);
+            } else {
+                throw new Error(`Item ${item.name} (Size: ${item.size}) is currently out of stock in your region.`);
+            }
+        }
+        
+        productsToUpdate.push({
+            product: dbProduct,
+            size: item.size,
+            quantity: item.quantity
+        });
+    }
+    
+    // 2. Safely deduct stock
+    for (const update of productsToUpdate) {
+        const { product, size, quantity } = update;
+        
+        if (product.stock && product.stock[size] !== undefined) {
+            product.stock[size] -= quantity;
+        }
+        
+        const whInventory = product.warehouseInventory.find(wh => wh.warehouseId === assignedWarehouse);
+        if (whInventory) {
+            whInventory.stockMap[size] -= quantity;
+            whInventory.stock -= quantity;
+        }
+        
+        product.markModified('stock');
+        product.markModified('warehouseInventory');
+        await product.save();
+    }
 };
 
 // global variables
@@ -108,173 +248,140 @@ try {
     console.error("Razorpay initialization error:", err);
 }
 
-// Placing orders using COD Method
-const placeOrder = async (req,res) => {
-    
-    try {
-        
-        const { userId, items, amount, address, couponCode, couponDiscount, tax, platformFee, subtotal, deliveryFee} = req.body;
+const processOrderLogic = async (reqBody, paymentMethodString) => {
+    const { userId, items, amount, address, couponCode, couponDiscount, tax, platformFee, subtotal, deliveryFee} = reqBody;
 
-        // AI Karma Score Check for COD
+    // AI Karma Score Check for COD
+    if (paymentMethodString === "COD") {
         const user = await userModel.findById(userId);
         if (user && user.karmaScore !== undefined && user.karmaScore < 40) {
-            return res.json({ success: false, message: "COD is disabled for your account due to low Karma Score (high return rate). Please use prepaid methods." });
+            throw new Error("COD is disabled for your account due to low Karma Score (high return rate). Please use prepaid methods.");
         }
+    }
 
-        // Validate Coupon Before Placing Order
-        if (couponCode) {
-            if (couponCode === 'BUNDLE20') {
-                const pastOrder = await orderModel.findOne({ userId, couponCode: 'BUNDLE20' });
-                if (pastOrder) {
-                    return res.json({ success: false, message: "Bundle discount is only valid for your first bundle purchase." });
-                }
-            } else {
-                const coupon = await couponModel.findOne({ code: couponCode.toUpperCase() });
-                if (!coupon) {
-                    return res.json({ success: false, message: "Invalid coupon code." });
-                }
-                if (coupon.isOneTime && coupon.isUsed) {
-                    return res.json({ success: false, message: "This coupon has already been used and is only valid for one order." });
-                }
-                if (coupon.usedBy && coupon.usedBy.includes(userId)) {
-                    return res.json({ success: false, message: "You have already used this coupon on a previous order." });
-                }
+    // Validate Coupon Before Placing Order
+    if (couponCode) {
+        if (couponCode === 'BUNDLE20') {
+            const pastOrder = await orderModel.findOne({ userId, couponCode: 'BUNDLE20' });
+            if (pastOrder) {
+                throw new Error("Bundle discount is only valid for your first bundle purchase.");
+            }
+        } else {
+            const coupon = await couponModel.findOne({ code: couponCode.toUpperCase() });
+            if (!coupon) {
+                throw new Error("Invalid coupon code.");
+            }
+            if (coupon.isOneTime && coupon.isUsed) {
+                throw new Error("This coupon has already been used and is only valid for one order.");
+            }
+            if (coupon.usedBy && coupon.usedBy.includes(userId)) {
+                throw new Error("You have already used this coupon on a previous order.");
             }
         }
+    }
 
-        const enrichedItems = await enrichItemsWithSellerId(items);
-        const now = Date.now();
+    const enrichedItems = await enrichItemsWithSellerId(items);
+    const now = Date.now();
 
-        const initialStatus = "Packing";
-        const estimatedDate = new Date(now + 3 * 24 * 60 * 60 * 1000).toDateString();
-
-        const orderData = {
-            userId,
-            items: enrichedItems,
-            address,
-            amount,
-            tax: tax || 0,
-            platformFee: platformFee || 0,
-            subtotal: subtotal || 0,
-            deliveryFee: deliveryFee || 0,
-            couponCode: couponCode || '',
-            couponDiscount: couponDiscount || 0,
-            status: initialStatus,
-            statusHistory: [{
-                status: initialStatus,
-                timestamp: now,
-                updatedBy: 'System',
-                note: 'Order placed and item packing initiated.'
-            }],
-            estimatedDelivery: estimatedDate,
-            paymentMethod: "COD",
-            payment: false,
-            date: now,
-            updatedAt: now
+    const initialStatus = "Packing";
+    
+    const estimatedDate = new Date(now + 3 * 24 * 60 * 60 * 1000).toDateString();
+    
+    // Determine origin warehouse from Seller's location
+    let originPincode = address.zipcode || address.pincode;
+    if (enrichedItems.length > 0 && enrichedItems[0].sellerId) {
+        const seller = await userModel.findById(enrichedItems[0].sellerId);
+        if (seller && seller.storePincode) {
+            originPincode = seller.storePincode;
         }
+    }
 
-        const newOrder = new orderModel(orderData)
-        await newOrder.save()
-        await markCouponAsUsed(couponCode, userId);
+    const assignedWarehouse = getAssignedWarehouse(originPincode);
+    if (!assignedWarehouse) {
+        throw new Error("Delivery not available from the seller's area.");
+    }
+    
+    await reserveStockForOrder(enrichedItems, assignedWarehouse);
 
-        await userModel.findByIdAndUpdate(userId,{cartData:{}})
+    const orderData = {
+        userId,
+        items: enrichedItems,
+        address,
+        amount,
+        tax: tax || 0,
+        platformFee: platformFee || 0,
+        subtotal: subtotal || 0,
+        deliveryFee: deliveryFee || 0,
+        couponCode: couponCode || '',
+        couponDiscount: couponDiscount || 0,
+        status: initialStatus,
+        statusHistory: [{
+            status: initialStatus,
+            timestamp: now,
+            updatedBy: 'System',
+            note: `Order placed via ${paymentMethodString} and packing initiated.`
+        }],
+        estimatedDelivery: estimatedDate,
+        paymentMethod: paymentMethodString,
+        payment: false,
+        date: now,
+        updatedAt: now,
+        assignedWarehouse
+    };
+
+    const newOrder = new orderModel(orderData);
+    await newOrder.save();
+    await markCouponAsUsed(couponCode, userId);
+
+    return { newOrder, enrichedItems };
+};
+
+// Placing orders using COD Method
+const placeOrder = async (req,res) => {
+    try {
+        const { newOrder } = await processOrderLogic(req.body, "COD");
+
+        await userModel.findByIdAndUpdate(req.body.userId, {cartData:{}});
         emitOrderUpdate(newOrder);
         await notifyOrderPlaced(newOrder._id);
 
-        res.json({success:true,message:"Order Placed", orderId: newOrder._id})
-
+        res.json({success:true,message:"Order Placed", orderId: newOrder._id});
 
     } catch (error) {
-        console.log(error)
-        res.json({success:false,message:error.message})
+        console.log(error);
+        res.json({success:false, message: error.message});
     }
-
 }
 
 // Placing orders using Stripe Method
 const placeOrderStripe = async (req,res) => {
     try {
-        
-        const { userId, items, amount, address, couponCode, couponDiscount, tax, platformFee, subtotal, deliveryFee} = req.body
-        
-        // Validate Coupon Before Placing Order
-        if (couponCode) {
-            if (couponCode === 'BUNDLE20') {
-                const pastOrder = await orderModel.findOne({ userId, couponCode: 'BUNDLE20' });
-                if (pastOrder) {
-                    return res.json({ success: false, message: "Bundle discount is only valid for your first bundle purchase." });
-                }
-            } else {
-                const coupon = await couponModel.findOne({ code: couponCode.toUpperCase() });
-                if (!coupon) {
-                    return res.json({ success: false, message: "Invalid coupon code." });
-                }
-                if (coupon.isOneTime && coupon.isUsed) {
-                    return res.json({ success: false, message: "This coupon has already been used and is only valid for one order." });
-                }
-                if (coupon.usedBy && coupon.usedBy.includes(userId)) {
-                    return res.json({ success: false, message: "You have already used this coupon on a previous order." });
-                }
-            }
-        }
-
-        const enrichedItems = await enrichItemsWithSellerId(items);
+        const { items, amount } = req.body;
         const { origin } = req.headers;
-        const now = Date.now();
-
-        const initialStatus = "Packing";
-        const estimatedDate = new Date(now + 3 * 24 * 60 * 60 * 1000).toDateString();
-
-        const orderData = {
-            userId,
-            items: enrichedItems,
-            address,
-            amount,
-            tax: tax || 0,
-            platformFee: platformFee || 0,
-            subtotal: subtotal || 0,
-            deliveryFee: deliveryFee || 0,
-            couponCode: couponCode || '',
-            couponDiscount: couponDiscount || 0,
-            status: initialStatus,
-            statusHistory: [{
-                status: initialStatus,
-                timestamp: now,
-                updatedBy: 'System',
-                note: 'Order placed via Stripe and packing initiated.'
-            }],
-            estimatedDelivery: estimatedDate,
-            paymentMethod: "Stripe",
-            payment: false,
-            date: now,
-            updatedAt: now
-        }
-
-        const newOrder = new orderModel(orderData)
-        await newOrder.save()
-        await markCouponAsUsed(couponCode, userId);
+        
+        const { newOrder } = await processOrderLogic(req.body, "Stripe");
 
         const line_items = items.map((item) => ({
             price_data: {
-                currency:currency,
+                currency: currency,
                 product_data: {
-                    name:item.name
+                    name: item.name
                 },
                 unit_amount: item.price * 100
             },
             quantity: item.quantity
-        }))
+        }));
 
         line_items.push({
             price_data: {
-                currency:currency,
+                currency: currency,
                 product_data: {
-                    name:'Delivery Charges'
+                    name: 'Delivery Charges'
                 },
                 unit_amount: deliveryCharge * 100
             },
             quantity: 1
-        })
+        });
 
         const session = await stripe.checkout.sessions.create({
             success_url: `${origin}/verify?success=true&orderId=${newOrder._id}`,
@@ -282,13 +389,13 @@ const placeOrderStripe = async (req,res) => {
             line_items,
             mode: 'payment',
             payment_method_types: ['card'],
-        })
+        });
 
         res.json({success:true,session_url:session.url});
 
     } catch (error) {
-        console.log(error)
-        res.json({success:false,message:error.message})
+        console.log(error);
+        res.json({success:false, message: error.message});
     }
 }
 
@@ -299,12 +406,12 @@ const verifyStripe = async (req,res) => {
 
     try {
         if (success === "true") {
-            await orderModel.findByIdAndUpdate(orderId, {payment:true});
+            const updatedOrder = await orderModel.findByIdAndUpdate(orderId, {payment:true}, {new: true});
             await userModel.findByIdAndUpdate(userId, {cartData: {}})
-            emitOrderUpdate(newOrder);
+            if (updatedOrder) emitOrderUpdate(updatedOrder);
             await notifyOrderPlaced(orderId);
             
-            res.json({success: true});
+            res.json({success: true, orderId});
         } else {
             await orderModel.findByIdAndDelete(orderId)
             res.json({success:false})
@@ -320,64 +427,9 @@ const verifyStripe = async (req,res) => {
 // Placing orders using Razorpay Method
 const placeOrderRazorpay = async (req,res) => {
     try {
+        const { amount } = req.body;
         
-        const { userId, items, amount, address, couponCode, couponDiscount, tax, platformFee, subtotal, deliveryFee} = req.body
-        
-        // Validate Coupon Before Placing Order
-        if (couponCode) {
-            if (couponCode === 'BUNDLE20') {
-                const pastOrder = await orderModel.findOne({ userId, couponCode: 'BUNDLE20' });
-                if (pastOrder) {
-                    return res.json({ success: false, message: "Bundle discount is only valid for your first bundle purchase." });
-                }
-            } else {
-                const coupon = await couponModel.findOne({ code: couponCode.toUpperCase() });
-                if (!coupon) {
-                    return res.json({ success: false, message: "Invalid coupon code." });
-                }
-                if (coupon.isOneTime && coupon.isUsed) {
-                    return res.json({ success: false, message: "This coupon has already been used and is only valid for one order." });
-                }
-                if (coupon.usedBy && coupon.usedBy.includes(userId)) {
-                    return res.json({ success: false, message: "You have already used this coupon on a previous order." });
-                }
-            }
-        }
-
-        const enrichedItems = await enrichItemsWithSellerId(items);
-        const now = Date.now();
-
-        const initialStatus = "Packing";
-        const estimatedDate = new Date(now + 3 * 24 * 60 * 60 * 1000).toDateString();
-
-        const orderData = {
-            userId,
-            items: enrichedItems,
-            address,
-            amount,
-            tax: tax || 0,
-            platformFee: platformFee || 0,
-            subtotal: subtotal || 0,
-            deliveryFee: deliveryFee || 0,
-            couponCode: couponCode || '',
-            couponDiscount: couponDiscount || 0,
-            status: initialStatus,
-            statusHistory: [{
-                status: initialStatus,
-                timestamp: now,
-                updatedBy: 'System',
-                note: 'Order placed via Razorpay and packing initiated.'
-            }],
-            estimatedDelivery: estimatedDate,
-            paymentMethod: "Razorpay",
-            payment: false,
-            date: now,
-            updatedAt: now
-        }
-
-        const newOrder = new orderModel(orderData)
-        await newOrder.save()
-        await markCouponAsUsed(couponCode);
+        const { newOrder, enrichedItems } = await processOrderLogic(req.body, "Razorpay");
 
         // Fetch Global Commission
         let settings = await settingsModel.findOne();
@@ -393,7 +445,9 @@ const placeOrderRazorpay = async (req,res) => {
             const razorpayAccountId = sellerItems.find(i => i.razorpayAccountId)?.razorpayAccountId;
             
             if (razorpayAccountId) {
-                const { sellerShare } = calculateSellerShare({ ...orderData, items: enrichedItems }, sellerId, commissionRate);
+                // Since we don't have orderData explicitly structured here as before, we pass the original req.body merged with enrichedItems
+                const orderDataForShare = { ...req.body, items: enrichedItems };
+                const { sellerShare } = calculateSellerShare(orderDataForShare, sellerId, commissionRate);
                 const sellerSharePaise = Math.round(sellerShare * 100); // in paise
                 
                 if (sellerSharePaise > 0) {
@@ -414,8 +468,8 @@ const placeOrderRazorpay = async (req,res) => {
         const options = {
             amount: amount * 100,
             currency: currency.toUpperCase(),
-            receipt : newOrder._id.toString(),
-        }
+            receipt: newOrder._id.toString(),
+        };
 
         if (transfers.length > 0) {
             options.transfers = transfers;
@@ -423,15 +477,15 @@ const placeOrderRazorpay = async (req,res) => {
 
         await razorpayInstance.orders.create(options, (error,order)=>{
             if (error) {
-                console.log(error)
-                return res.json({success:false, message: error})
+                console.log(error);
+                return res.json({success:false, message: error});
             }
-            res.json({success:true,order})
-        })
+            res.json({success:true, order});
+        });
 
     } catch (error) {
-        console.log(error)
-        res.json({success:false,message:error.message})
+        console.log(error);
+        res.json({success:false, message: error.message});
     }
 }
 
@@ -442,9 +496,9 @@ const verifyRazorpay = async (req,res) => {
 
         const orderInfo = await razorpayInstance.orders.fetch(razorpay_order_id)
         if (orderInfo.status === 'paid') {
-            await orderModel.findByIdAndUpdate(orderInfo.receipt,{payment:true});
+            const updatedOrder = await orderModel.findByIdAndUpdate(orderInfo.receipt,{payment:true},{new:true});
             await userModel.findByIdAndUpdate(userId,{cartData:{}})
-            emitOrderUpdate(newOrder);
+            if (updatedOrder) emitOrderUpdate(updatedOrder);
             await notifyOrderPlaced(orderInfo.receipt);
             
             res.json({ success: true, message: "Payment Successful" })
@@ -523,22 +577,33 @@ const updateStatus = async (req,res) => {
             return res.json({ success: false, message: 'Order not found' });
         }
 
-        const validAdminStatuses = ['Packed', 'Ready to Ship', 'Handed to Logistics', 'Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled'];
+        const validAdminStatuses = ['Packing', 'Packed', 'Ready for Pickup', 'Assigned', 'Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Returned', 'Cancelled'];
         
         if (existingOrder.cancelStatus === 'Requested' && status !== 'Cancelled') {
             return res.json({ success: false, message: "Cannot update status while a cancellation request is pending." });
         }
 
-        if (['Packing', 'Accepted'].includes(existingOrder.status) && status !== 'Cancelled') {
-            return res.json({ success: false, message: "Admin cannot update status before seller fulfills the order (Packed)." });
-        }
-
+        // Only allow Admin to move from Packing -> Packed -> Ready for Pickup
+        // If it's jumping directly from Packing to Delivered, reject it.
         const currentStatusIdx = validAdminStatuses.indexOf(existingOrder.status);
         const nextStatusIdx = validAdminStatuses.indexOf(status);
 
-        if (nextStatusIdx !== -1 && currentStatusIdx !== -1 && nextStatusIdx < currentStatusIdx) {
-            return res.json({ success: false, message: "Cannot move order status backwards." });
+        if (nextStatusIdx !== -1 && currentStatusIdx !== -1) {
+            if (nextStatusIdx < currentStatusIdx) {
+                return res.json({ success: false, message: "Cannot move order status backwards." });
+            }
+            if (nextStatusIdx > currentStatusIdx + 1 && status !== 'Cancelled' && status !== 'Returned') {
+                 // return res.json({ success: false, message: "Strict workflow enforced: Cannot skip status steps." });
+                 // Let's enforce strict workflow
+                 if (existingOrder.status === 'Packing' && status !== 'Packed') {
+                     return res.json({ success: false, message: "Order must be Packed before any other status." });
+                 }
+                 if (existingOrder.status === 'Packed' && status !== 'Ready for Pickup') {
+                     return res.json({ success: false, message: "Order must be Marked Ready for Dispatch." });
+                 }
+            }
         }
+
 
         const history = existingOrder.statusHistory || [];
         const newHistoryEntry = {
@@ -885,15 +950,27 @@ const assignWishmaster = async (req, res) => {
 
         if (
             order.status !== 'Ready for Pickup' && 
-            order.status !== 'Assigned' && 
             order.returnStatus !== 'Approved'
         ) {
-            return res.json({ success: false, message: `Cannot assign Wishmaster. Current status is ${order.status}, Return Status: ${order.returnStatus}` });
+            return res.json({ success: false, message: `Cannot assign Wishmaster. Order is already ${order.status}.` });
         }
 
         const partner = await userModel.findOne({ _id: partnerId, isDeliveryPartner: true });
         if (!partner) {
             return res.json({ success: false, message: 'Valid and approved Delivery Partner not found' });
+        }
+
+        // STEP 5: Hub Routing Security Check (case-insensitive)
+        const getCityWarehouse = (city = '') => {
+            const c = city.trim().toLowerCase();
+            if (c.includes('nagpur')) return 'WH_NAGPUR';
+            if (c.includes('wardha')) return 'WH_WARDHA';
+            if (c.includes('dhamangaon') || c.includes('dhamangoan')) return 'WH_DHAMANGAON';
+            return city.trim(); // fallback to raw value
+        };
+        const partnerWarehouse = getCityWarehouse(partner.serviceCity);
+        if (order.assignedWarehouse && partnerWarehouse !== order.assignedWarehouse) {
+            return res.json({ success: false, message: `Cannot assign order from ${order.assignedWarehouse} to a Delivery Partner in ${partner.serviceCity || 'Unknown City'}.` });
         }
 
         const now = Date.now();
@@ -1048,4 +1125,4 @@ const processRefund = async (req, res) => {
     }
 };
 
-export {verifyRazorpay, verifyStripe ,placeOrder, placeOrderStripe, placeOrderRazorpay, allOrders, userOrders, updateStatus, deleteOrder, getAdminAnalytics, requestCancellation, approveCancellation, rejectCancellation, assignWishmaster, requestReturn, processRefund}
+export {autoAssignToDeliveryBoy, verifyRazorpay, verifyStripe ,placeOrder, placeOrderStripe, placeOrderRazorpay, allOrders, userOrders, updateStatus, deleteOrder, getAdminAnalytics, requestCancellation, approveCancellation, rejectCancellation, assignWishmaster, requestReturn, processRefund}

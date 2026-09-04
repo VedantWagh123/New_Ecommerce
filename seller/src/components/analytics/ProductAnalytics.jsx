@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { Eye, ShoppingCart, TrendingUp, Package, RefreshCw, TrendingDown, Box, ArrowRight, Sparkles, AlertTriangle } from 'lucide-react';
 
-const currency = '$';
+const currency = '₹';
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#64748b'];
 
 export const ProductAnalytics = ({ token, timeframe }) => {

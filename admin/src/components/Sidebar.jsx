@@ -93,6 +93,7 @@ const Sidebar = ({ role }) => {
       children: [
         { to: '/sellers', label: 'Sellers Hub', icon: Store },
         { to: '/delivery-partners', label: 'Fleet / Delivery', icon: Truck },
+        { to: '/live-map', label: 'Live GPS Map', icon: Truck, badge: 'Live' },
         { to: '/sub-admins', label: 'Manage Admins', icon: Users }
       ]
     },

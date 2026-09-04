@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 const settingsSchema = new mongoose.Schema({
     platformCommission: { type: Number, default: 10, required: true }, // Percentage (e.g., 10 for 10%)
+    autoAssignDelivery: { type: Boolean, default: false }, // Automation Engine Toggle
     updatedAt: { type: Number, default: Date.now }
 }, { minimize: false });
 

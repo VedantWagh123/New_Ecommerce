@@ -6,7 +6,8 @@ import { backendUrl } from '../App';
 import { toast } from 'react-toastify';
 
 const Navbar = ({ storeInfo, searchQuery, setSearchQuery, setSidebarOpen }) => {
-  const currentDate = new Date().toLocaleDateString('en-US', {
+  const currentDate = new Date().toLocaleDateString('en-IN', {
+    timeZone: 'Asia/Kolkata',
     month: 'short',
     day: 'numeric',
     year: 'numeric'

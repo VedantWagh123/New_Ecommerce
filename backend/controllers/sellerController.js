@@ -11,6 +11,7 @@ import settingsModel from "../models/settingsModel.js";
 import { sendNotification, getIO, emitProductUpdate, emitOrderUpdate } from "../config/socket.js";
 import { clearProductCache } from "../config/redis.js";
 import { calculateSellerShare } from "../utils/financeUtils.js";
+import { autoAssignToDeliveryBoy } from "./orderController.js";
 
 const createToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET);
@@ -195,11 +196,13 @@ const getSellerProfile = async (req, res) => {
 
 const updateSellerProfile = async (req, res) => {
     try {
-        const { storeName, storePhone, storeDescription, storeLogo, bankDetails, name } = req.body;
+        const { storeName, storePhone, storeCity, storePincode, storeDescription, storeLogo, bankDetails, name } = req.body;
 
         const updateData = {};
         if (storeName) updateData.storeName = storeName;
         if (storePhone !== undefined) updateData.storePhone = storePhone;
+        if (storeCity !== undefined) updateData.storeCity = storeCity;
+        if (storePincode !== undefined) updateData.storePincode = storePincode;
         if (storeDescription !== undefined) updateData.storeDescription = storeDescription;
         if (storeLogo !== undefined) updateData.storeLogo = storeLogo;
         if (name) updateData.name = name;
@@ -391,7 +394,7 @@ const addSellerProduct = async (req, res) => {
 
         const {
             name, description, price, discount, category, subCategory,
-            sizes, colors, material, bestseller, returnAvailable, cashOnDelivery, stock
+            sizes, colors, material, bestseller, returnAvailable, cashOnDelivery, stock, warehouseInventory
         } = req.body;
 
         const image1 = req.files?.image1?.[0];
@@ -418,6 +421,22 @@ const addSellerProduct = async (req, res) => {
             } catch (e) {
                 parsedStock = {};
             }
+        }
+
+        let parsedWarehouseInventory = [];
+        if (warehouseInventory) {
+            try {
+                parsedWarehouseInventory = typeof warehouseInventory === 'string' ? JSON.parse(warehouseInventory) : warehouseInventory;
+            } catch (e) {
+                parsedWarehouseInventory = [];
+            }
+        } else if (Object.keys(parsedStock).length > 0) {
+            const totalStock = Object.values(parsedStock).reduce((acc, qty) => acc + Number(qty), 0);
+            parsedWarehouseInventory = [
+                { warehouseId: 'WH_NAGPUR', stock: totalStock, reserved: 0 },
+                { warehouseId: 'WH_WARDHA', stock: 0, reserved: 0 },
+                { warehouseId: 'WH_DHAMANGAON', stock: 0, reserved: 0 }
+            ];
         }
 
         let parsedSizes = [];
@@ -461,6 +480,7 @@ const addSellerProduct = async (req, res) => {
             returnAvailable: returnAvailable === "true" || returnAvailable === true,
             cashOnDelivery: cashOnDelivery === "true" || cashOnDelivery === true,
             stock: parsedStock,
+            warehouseInventory: parsedWarehouseInventory,
             image: imagesUrl,
             sellerId: req.sellerId,
             approvalStatus: 'pending',
@@ -494,7 +514,7 @@ const addSellerProduct = async (req, res) => {
 
 const editSellerProduct = async (req, res) => {
     try {
-        const { id, name, description, price, discount, category, subCategory, sizes, colors, material, stock, bestseller } = req.body;
+        const { id, name, description, price, discount, category, subCategory, sizes, colors, material, stock, bestseller, warehouseInventory } = req.body;
 
         const product = await productModel.findOne({ _id: id, sellerId: req.sellerId });
         if (!product) {
@@ -530,6 +550,19 @@ const editSellerProduct = async (req, res) => {
         }
         if (stock) {
             updateData.stock = typeof stock === 'string' ? JSON.parse(stock) : stock;
+            
+            if (!warehouseInventory) {
+                const totalStock = Object.values(updateData.stock).reduce((acc, qty) => acc + Number(qty), 0);
+                updateData.warehouseInventory = [
+                    { warehouseId: 'WH_NAGPUR', stock: totalStock, reserved: 0 },
+                    { warehouseId: 'WH_WARDHA', stock: 0, reserved: 0 },
+                    { warehouseId: 'WH_DHAMANGAON', stock: 0, reserved: 0 }
+                ];
+            }
+        }
+        
+        if (warehouseInventory) {
+            updateData.warehouseInventory = typeof warehouseInventory === 'string' ? JSON.parse(warehouseInventory) : warehouseInventory;
         }
 
         await productModel.findByIdAndUpdate(id, updateData);
@@ -657,6 +690,10 @@ const updateSellerOrderStatus = async (req, res) => {
         await sendNotification('admin', null, `Order ${status}`, `Order #${order._id.toString().slice(-8).toUpperCase()} status updated to ${status} by seller ${sellerStore}.`, order._id);
 
         emitOrderUpdate(order);
+        
+        if (status === 'Ready for Pickup') {
+            await autoAssignToDeliveryBoy(order._id);
+        }
 
         res.json({ success: true, message: `Order status updated to ${status}` });
 
@@ -671,9 +708,37 @@ const getInventory = async (req, res) => {
         const products = await productModel.find({ sellerId: req.sellerId }).sort({ name: 1 });
         
         const inventory = products.map(product => {
-            const stockMap = product.stock || {};
-            const totalStock = Object.values(stockMap).reduce((acc, qty) => acc + Number(qty), 0);
-            
+            // Primary: use warehouseInventory if it exists and has data
+            let totalStock = 0;
+            let stockMap = {};
+
+            if (product.warehouseInventory && product.warehouseInventory.length > 0) {
+                // Sum across all warehouses
+                product.warehouseInventory.forEach(wh => {
+                    if (wh.stockMap && Object.keys(wh.stockMap).length > 0) {
+                        // Variant-level stock map exists
+                        Object.entries(wh.stockMap).forEach(([size, qty]) => {
+                            stockMap[size] = (stockMap[size] || 0) + Number(qty);
+                            totalStock += Number(qty);
+                        });
+                    } else {
+                        // Only aggregate stock number, no size breakdown
+                        totalStock += Number(wh.stock || 0);
+                    }
+                });
+            } else {
+                // Fallback: use legacy stock map on product
+                const rawStock = product.toObject ? product.toObject() : product;
+                const legacyStock = rawStock.stock || {};
+                stockMap = legacyStock;
+                totalStock = Object.values(legacyStock).reduce((acc, qty) => acc + Number(qty), 0);
+            }
+
+            // If stockMap empty but we have sizes, initialize to 0
+            if (Object.keys(stockMap).length === 0 && product.sizes?.length > 0) {
+                product.sizes.forEach(size => { stockMap[size] = 0; });
+            }
+
             let status = 'In Stock';
             if (totalStock === 0) status = 'Out of Stock';
             else if (totalStock <= 5) status = 'Low Stock';
@@ -681,11 +746,12 @@ const getInventory = async (req, res) => {
             return {
                 _id: product._id,
                 name: product.name,
-                image: product.image[0] || '',
-                category: product.category,
+                image: product.image?.[0] || '',
+                category: Array.isArray(product.category) ? product.category.join(', ') : product.category,
                 price: product.price,
-                sizes: product.sizes,
+                sizes: product.sizes || [],
                 stock: stockMap,
+                warehouseInventory: product.warehouseInventory || [],
                 totalStock,
                 status
             };
@@ -700,13 +766,26 @@ const getInventory = async (req, res) => {
 
 const updateStock = async (req, res) => {
     try {
-        const { productId, stock } = req.body;
+        const { productId, stock, warehouseInventory } = req.body;
         const product = await productModel.findOne({ _id: productId, sellerId: req.sellerId });
         if (!product) {
             return res.json({ success: false, message: "Product not found" });
         }
 
         product.stock = stock;
+        
+        if (warehouseInventory) {
+            product.warehouseInventory = typeof warehouseInventory === 'string' ? JSON.parse(warehouseInventory) : warehouseInventory;
+        } else if (stock) {
+            const parsedStock = typeof stock === 'string' ? JSON.parse(stock) : stock;
+            const totalStock = Object.values(parsedStock).reduce((acc, qty) => acc + Number(qty), 0);
+            product.warehouseInventory = [
+                { warehouseId: 'WH_NAGPUR', stock: totalStock, reserved: 0 },
+                { warehouseId: 'WH_WARDHA', stock: 0, reserved: 0 },
+                { warehouseId: 'WH_DHAMANGAON', stock: 0, reserved: 0 }
+            ];
+        }
+
         await product.save();
         
         emitProductUpdate(product);

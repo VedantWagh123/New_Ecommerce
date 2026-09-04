@@ -25,6 +25,8 @@ const userSchema = new mongoose.Schema({
     storeName: { type: String, default: '' },
     storeDescription: { type: String, default: '' },
     storePhone: { type: String, default: '' },
+    storeCity: { type: String, default: '' },
+    storePincode: { type: String, default: '' },
     storeLogo: { type: String, default: '' },
     isDeliveryPartner: { type: Boolean, default: false },
     isDeliveryOnline: { type: Boolean, default: false },
@@ -33,6 +35,11 @@ const userSchema = new mongoose.Schema({
     drivingLicense: { type: String, default: '' },
     serviceCity: { type: String, default: '' },
     deliveryEarnings: { type: Number, default: 0 },
+    liveLocation: {
+        lat: { type: Number, default: null },
+        lng: { type: Number, default: null },
+        updatedAt: { type: Number, default: null }
+    },
     bankDetails: {
         accountHolder: { type: String, default: '' },
         accountNumber: { type: String, default: '' },

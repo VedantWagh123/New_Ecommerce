@@ -87,12 +87,7 @@ const Dashboard = ({ token, searchQuery }) => {
     return { ...cat, color: colors[i % colors.length], percent };
   });
 
-  // Mock Sparklines
-  const generateSparkline = (base, variance) => {
-    return Array.from({ length: 7 }, (_, i) => ({
-      value: base + Math.random() * variance - (variance/2)
-    }));
-  };
+
 
   // The backend now provides real sales trend in `charts.salesTrend`.
   // We will use that instead of overviewData.
@@ -179,13 +174,7 @@ const Dashboard = ({ token, searchQuery }) => {
               <ShoppingBag className="w-4 h-4" />
             </div>
           </div>
-          <div className="h-10 w-full absolute bottom-0 left-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={generateSparkline(100, 20)}>
-                <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+
         </div>
 
         {/* Card 2: Total Revenue */}
@@ -202,13 +191,7 @@ const Dashboard = ({ token, searchQuery }) => {
               <Wallet className="w-4 h-4" />
             </div>
           </div>
-          <div className="h-10 w-full absolute bottom-0 left-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={generateSparkline(100, 20)}>
-                <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+
         </div>
 
         {/* Card 3: Avg Order Value */}
@@ -225,13 +208,7 @@ const Dashboard = ({ token, searchQuery }) => {
               <BarChart2 className="w-4 h-4" />
             </div>
           </div>
-          <div className="h-10 w-full absolute bottom-0 left-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={generateSparkline(100, 20)}>
-                <Line type="monotone" dataKey="value" stroke="#a855f7" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+
         </div>
 
         {/* Card 4: Total Customers */}
@@ -248,13 +225,7 @@ const Dashboard = ({ token, searchQuery }) => {
               <Users className="w-4 h-4" />
             </div>
           </div>
-          <div className="h-10 w-full absolute bottom-0 left-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={generateSparkline(100, 20)}>
-                <Line type="monotone" dataKey="value" stroke="#f97316" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+
         </div>
 
         {/* Card 5: Pending Orders */}
@@ -271,13 +242,7 @@ const Dashboard = ({ token, searchQuery }) => {
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <div className="h-10 w-full absolute bottom-0 left-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={generateSparkline(100, 20)}>
-                <Line type="monotone" dataKey="value" stroke="#ef4444" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+
         </div>
       </div>
 

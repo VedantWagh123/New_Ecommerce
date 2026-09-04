@@ -8,6 +8,8 @@ const productSchema = new mongoose.Schema({
     category: { type: Array, required: true, default: [] },
     subCategory: { type: String, required: true },
     sizes: { type: Array, required: true },
+    warehouseInventory: { type: Array, default: [] },
+    stock: { type: mongoose.Schema.Types.Mixed, default: {} },
     bestseller: { type: Boolean },
     isFeatured: { type: Boolean, default: false },
     returnAvailable: { type: Boolean, default: true },

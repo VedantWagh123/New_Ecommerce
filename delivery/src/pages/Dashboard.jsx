@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { 
@@ -11,12 +11,15 @@ import {
   Package,
   TrendingUp,
   Activity,
-  CheckCircle2
+  CheckCircle2,
+  Navigation,
+  WifiOff
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { SocketContext } from '../context/SocketContext';
+import { formatTimeIST, formatDateShortIST } from '../utils/formatIST';
 
-const currency = '$';
+const currency = '₹';
 
 const Dashboard = ({ token, searchQuery }) => {
   const [allOrders, setAllOrders] = useState([]);
@@ -52,6 +55,57 @@ const Dashboard = ({ token, searchQuery }) => {
   }, [token]);
 
   const { socket } = useContext(SocketContext);
+  const [gpsStatus, setGpsStatus] = useState('checking'); // 'live' | 'simulating' | 'offline' | 'checking'
+  const simulationRef = useRef(null);
+
+  // Nagpur city center coordinates (slightly randomized for simulation)
+  const NAGPUR_CENTER = { lat: 21.1458, lng: 79.0882 };
+
+  const startSimulation = () => {
+    if (!socket) { toast.error('Socket not connected'); return; }
+    if (simulationRef.current) return; // already running
+    setGpsStatus('simulating');
+    toast.info('📍 GPS Simulation started — you will appear on the Live Map!');
+    let tick = 0;
+    simulationRef.current = setInterval(() => {
+      // Small random walk to show movement
+      const lat = NAGPUR_CENTER.lat + (Math.random() - 0.5) * 0.02;
+      const lng = NAGPUR_CENTER.lng + (Math.random() - 0.5) * 0.02;
+      socket.emit('update-location', { lat, lng });
+      tick++;
+    }, 5000);
+  };
+
+  const stopSimulation = () => {
+    if (simulationRef.current) {
+      clearInterval(simulationRef.current);
+      simulationRef.current = null;
+    }
+    setGpsStatus('offline');
+    toast.info('GPS Simulation stopped.');
+  };
+
+  // Try real GPS first
+  useEffect(() => {
+    if (!socket) return;
+    if (!('geolocation' in navigator)) {
+      setGpsStatus('offline');
+      return;
+    }
+    // Test if GPS permission works
+    navigator.geolocation.getCurrentPosition(
+      () => setGpsStatus('live'),
+      () => setGpsStatus('offline'),
+      { timeout: 5000 }
+    );
+
+    return () => {
+      if (simulationRef.current) {
+        clearInterval(simulationRef.current);
+        simulationRef.current = null;
+      }
+    };
+  }, [socket]);
 
   useEffect(() => {
     if (socket) {
@@ -74,6 +128,26 @@ const Dashboard = ({ token, searchQuery }) => {
 
       if (response.data.success) {
         toast.success(response.data.message);
+        fetchOrders();
+      } else {
+        toast.error(response.data.message);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message);
+    } finally {
+      setAcceptingId(null);
+    }
+  };
+
+  const handleRejectDelivery = async (orderId) => {
+    try {
+      setAcceptingId(orderId); // Reusing acceptingId as a general loading state for this order
+      const response = await axios.post(`${backendUrl}/api/delivery/reject`, { orderId }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        toast.info(response.data.message);
         fetchOrders();
       } else {
         toast.error(response.data.message);
@@ -131,9 +205,49 @@ const Dashboard = ({ token, searchQuery }) => {
             Welcome back! Here is your delivery performance and active assignments.
           </p>
         </div>
-        <button onClick={fetchOrders} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl shadow-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
-          <Clock className="w-4 h-4" /> REFRESH
-        </button>
+        <div className="flex items-center gap-3">
+          {/* GPS Status Badge */}
+          {gpsStatus === 'live' && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-bold text-emerald-700">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              GPS Live
+            </span>
+          )}
+          {gpsStatus === 'simulating' && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full text-xs font-bold text-blue-700">
+              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+              Simulating GPS
+            </span>
+          )}
+          {(gpsStatus === 'offline' || gpsStatus === 'checking') && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs font-bold text-amber-700">
+              <WifiOff className="w-3 h-3" />
+              GPS Offline
+            </span>
+          )}
+
+          {/* Simulate GPS Button (for localhost testing) */}
+          {gpsStatus !== 'live' && gpsStatus !== 'simulating' && (
+            <button 
+              onClick={startSimulation}
+              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-2"
+            >
+              <Navigation className="w-3.5 h-3.5" /> Simulate GPS
+            </button>
+          )}
+          {gpsStatus === 'simulating' && (
+            <button 
+              onClick={stopSimulation}
+              className="px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-2"
+            >
+              Stop Simulation
+            </button>
+          )}
+
+          <button onClick={fetchOrders} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl shadow-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
+            <Clock className="w-4 h-4" /> REFRESH
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -242,7 +356,7 @@ const Dashboard = ({ token, searchQuery }) => {
                             </span>
                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
                               <Clock className="w-3 h-3" /> 
-                              {new Date(order.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              Assigned {formatTimeIST(order.date)}
                             </span>
                           </div>
                           <div className="text-right bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
@@ -269,15 +383,24 @@ const Dashboard = ({ token, searchQuery }) => {
                           </div>
                         </div>
 
-                        <button
-                          onClick={() => handleAcceptDelivery(order._id)}
-                          disabled={acceptingId === order._id}
-                          className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 text-xs tracking-wide"
-                        >
-                          {acceptingId === order._id ? 'ACCEPTING...' : (
-                            <>ACCEPT <ArrowRight className="w-3.5 h-3.5" /></>
-                          )}
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleRejectDelivery(order._id)}
+                            disabled={acceptingId === order._id}
+                            className="w-1/3 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1 disabled:opacity-50 text-[10px] tracking-wide uppercase"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            onClick={() => handleAcceptDelivery(order._id)}
+                            disabled={acceptingId === order._id}
+                            className="w-2/3 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 text-xs tracking-wide"
+                          >
+                            {acceptingId === order._id ? 'WAIT...' : (
+                              <>ACCEPT <ArrowRight className="w-3.5 h-3.5" /></>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -308,7 +431,7 @@ const Dashboard = ({ token, searchQuery }) => {
                           </p>
                         </div>
                         <span className="text-[9px] font-bold text-slate-400 pt-1.5">
-                          {new Date(order.date).toLocaleDateString(undefined, {month:'short', day:'numeric'})}
+                          {formatDateShortIST(order.date)}
                         </span>
                       </div>
                     ))}

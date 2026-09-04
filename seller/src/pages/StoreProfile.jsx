@@ -8,6 +8,8 @@ const StoreProfile = ({ token, setStoreInfo }) => {
     name: '',
     storeName: '',
     storePhone: '',
+    storeCity: '',
+    storePincode: '',
     storeDescription: '',
     storeLogo: '',
     bankDetails: {
@@ -56,6 +58,8 @@ const StoreProfile = ({ token, setStoreInfo }) => {
         name: profile.name,
         storeName: profile.storeName,
         storePhone: profile.storePhone,
+        storeCity: profile.storeCity,
+        storePincode: profile.storePincode,
         storeDescription: profile.storeDescription,
         storeLogo: profile.storeLogo,
         bankDetails: profile.bankDetails
@@ -128,6 +132,28 @@ const StoreProfile = ({ token, setStoreInfo }) => {
                 value={profile.storePhone || ''}
                 onChange={(e) => setProfile({ ...profile, storePhone: e.target.value })}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Base City (Operations)</label>
+              <input
+                type="text"
+                value={profile.storeCity || ''}
+                onChange={(e) => setProfile({ ...profile, storeCity: e.target.value })}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
+                placeholder="e.g. Nagpur"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Base Pincode</label>
+              <input
+                type="text"
+                value={profile.storePincode || ''}
+                onChange={(e) => setProfile({ ...profile, storePincode: e.target.value })}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
+                placeholder="e.g. 440001"
               />
             </div>
 

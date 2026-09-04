@@ -15,9 +15,10 @@ export const initSocket = (server) => {
     io.on('connection', (socket) => {
         const { token, role } = socket.handshake.auth;
 
+        let decoded = null;
         if (token && token !== 'null' && token !== '') {
             try {
-                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                decoded = jwt.verify(token, process.env.JWT_SECRET);
                 
                 let room = '';
                 if (['admin', 'super_admin', 'support', 'marketing'].includes(role) || 
@@ -41,6 +42,50 @@ export const initSocket = (server) => {
         } else if (role === 'admin') {
            // Admin token might be different, wait, admin token isn't an object, it's a string, we check above.
         }
+
+        socket.on('update-location', async (data) => {
+            if (role === 'delivery' && decoded && decoded.id) {
+                try {
+                    const userModel = (await import('../models/userModel.js')).default;
+                    
+                    // Always save to MongoDB (reliable, no connection issues)
+                    const partner = await userModel.findByIdAndUpdate(
+                        decoded.id,
+                        { 
+                            liveLocation: { 
+                                lat: data.lat, 
+                                lng: data.lng, 
+                                updatedAt: Date.now() 
+                            } 
+                        },
+                        { new: true }
+                    ).select('name phone');
+
+                    const locData = {
+                        lat: data.lat,
+                        lng: data.lng,
+                        timestamp: Date.now(),
+                        deliveryId: decoded.id,
+                        name: partner?.name || 'Wishmaster',
+                        phone: partner?.phone || ''
+                    };
+
+                    // Also try Redis as fast cache (optional, non-blocking)
+                    try {
+                        const redisClient = (await import('./redis.js')).getRedisClient();
+                        if (redisClient && redisClient.isReady) {
+                            await redisClient.setEx(`loc:${decoded.id}`, 3600, JSON.stringify(locData));
+                        }
+                    } catch (_) { /* Redis unavailable, MongoDB is enough */ }
+                    
+                    // Emit to admin room in real-time
+                    io.to('admin').emit('live-location-update', locData);
+
+                } catch (err) {
+                    console.error("GPS location save error:", err);
+                }
+            }
+        });
 
         socket.on('disconnect', () => {
             console.log('User disconnected', socket.id);

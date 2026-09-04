@@ -26,6 +26,7 @@ const orderSchema = new mongoose.Schema({
     returnDate: { type: Number, default: null },
     refundStatus: { type: String, default: 'None', enum: ['None', 'Pending', 'Completed', 'Failed'] },
     refundAmount: { type: Number, default: 0 },
+    assignedWarehouse: { type: String, default: 'Legacy' },
     deliveryPartnerId: { type: String, default: null },
     pickupOTP: { type: String, default: '' },
     deliveryOTP: { type: String, default: '' },

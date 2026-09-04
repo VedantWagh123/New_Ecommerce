@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { Wallet, DollarSign, ArrowUpRight, Clock, CheckCircle2, Building2, PlusCircle, X } from 'lucide-react';
+import { formatDateOnlyIST } from '../utils/formatIST';
 
 const currency = '₹';
 
@@ -168,7 +169,7 @@ const Earnings = ({ token }) => {
                       </span>
                     </td>
                     <td className="py-4 px-6 text-slate-400">
-                      {new Date(p.date).toLocaleDateString()}
+                      {formatDateOnlyIST(p.date)}
                     </td>
                   </tr>
                 ))}
@@ -191,7 +192,7 @@ const Earnings = ({ token }) => {
 
             <form onSubmit={handleRequestPayout} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Payout Amount ($)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Payout Amount (₹)</label>
                 <input
                   type="number"
                   required

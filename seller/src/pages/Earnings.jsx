@@ -3,7 +3,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import { Wallet, DollarSign, ArrowUpRight, Clock, CheckCircle2, Building2, PlusCircle, X } from 'lucide-react';
 
-const currency = '$';
+const currency = '₹';
 
 const Earnings = ({ token }) => {
   const [summary, setSummary] = useState({

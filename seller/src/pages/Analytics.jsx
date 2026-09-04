@@ -15,11 +15,18 @@ import 'jspdf-autotable';
 
 const currency = '₹';
 
-const KPI = ({ title, value, previousValue, isCurrency = false, Icon, iconBg, iconColor, loading }) => {
-  const percentChange = previousValue 
-    ? (((value - previousValue) / previousValue) * 100).toFixed(1)
+const KPI = ({ title, value, previousValue, isCurrency = false, isPercent = false, Icon, iconBg, iconColor, loading }) => {
+  const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]+/g, '')) : (value || 0);
+  const numPrev = typeof previousValue === 'string' ? parseFloat(previousValue.replace(/[^0-9.-]+/g, '')) : (previousValue || 0);
+  
+  const percentChange = numPrev 
+    ? (((numValue - numPrev) / numPrev) * 100).toFixed(1)
     : '0.0';
   const isPositive = Number(percentChange) >= 0;
+
+  const displayValue = typeof value === 'number' 
+    ? value.toLocaleString(undefined, { minimumFractionDigits: isCurrency || isPercent ? 2 : 0, maximumFractionDigits: isCurrency || isPercent ? 2 : 0 })
+    : value;
 
   return (
     <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm transition-all hover:shadow-md">
@@ -30,7 +37,7 @@ const KPI = ({ title, value, previousValue, isCurrency = false, Icon, iconBg, ic
             <div className="h-8 w-24 bg-slate-100 animate-pulse rounded-md"></div>
           ) : (
             <h3 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              {isCurrency && currency}{typeof value === 'number' && !isCurrency ? value.toLocaleString() : value}
+              {isCurrency && currency}{displayValue}{isPercent && '%'}
               <span className={`flex items-center text-[11px] font-bold px-1.5 py-0.5 rounded-full ${isPositive ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
                 {isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
                 {Math.abs(percentChange)}%
@@ -109,13 +116,7 @@ const Analytics = ({ token }) => {
 
   const totalStatus = statusData.reduce((acc, curr) => acc + curr.value, 0);
 
-  const demoCities = [
-    { name: 'Nagpur', count: 425, max: 500 },
-    { name: 'Pune', count: 312, max: 500 },
-    { name: 'Mumbai', count: 256, max: 500 },
-    { name: 'Wardha', count: 127, max: 500 },
-    { name: 'Amravati', count: 86, max: 500 },
-  ];
+  const demoCities = [];
 
   // PDF Download Function
   const downloadReport = () => {
@@ -248,8 +249,9 @@ const Analytics = ({ token }) => {
         />
         <KPI 
           title="Success Rate" 
-          value={data ? `${data.overview.successRate}%` : '0%'} 
+          value={data ? data.overview.successRate : 0} 
           previousValue={data ? data.overview.successRate - 2 : 0} 
+          isPercent={true}
           Icon={Clock} 
           iconBg="bg-blue-50" 
           iconColor="text-blue-500" 
@@ -387,30 +389,12 @@ const Analytics = ({ token }) => {
           )}
         </div>
 
-        {/* Top Service Cities (Demo Data) */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        {/* Top Service Cities */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-center">
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-bold text-slate-900">Top Service Cities</h3>
-            <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold uppercase rounded-md">Demo Data</span>
           </div>
-          <p className="text-xs text-slate-400 mb-6">City-level analytics coming soon.</p>
-          
-          <div className="space-y-4">
-            {demoCities.map((city, idx) => (
-              <div key={idx}>
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span className="text-slate-700">{city.name}</span>
-                  <span className="text-slate-900">{city.count}</span>
-                </div>
-                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-indigo-600 h-full rounded-full"
-                    style={{ width: `${(city.count / city.max) * 100}%` }}
-                  ></div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <p className="text-xs text-slate-400 mb-6 text-center">City-level analytics coming soon.</p>
         </div>
 
         {/* Performance Score */}

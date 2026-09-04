@@ -64,6 +64,44 @@ const acceptDelivery = async (req, res) => {
     }
 };
 
+// Reject an assigned order
+const rejectDelivery = async (req, res) => {
+    try {
+        const { orderId } = req.body;
+        const deliveryPartnerId = req.deliveryPartnerId;
+
+        const order = await orderModel.findOne({ _id: orderId, deliveryPartnerId });
+        if (!order) return res.json({ success: false, message: 'Order not found or not assigned to you' });
+        
+        if (order.status !== 'Assigned') {
+            return res.json({ success: false, message: `Cannot reject. Current status is ${order.status}` });
+        }
+
+        const history = order.statusHistory || [];
+        history.push({
+            status: 'Ready for Pickup',
+            timestamp: Date.now(),
+            updatedBy: req.deliveryPartner.name,
+            note: 'Delivery partner has rejected the assignment. Reverting to Ready for Pickup.'
+        });
+
+        order.status = 'Ready for Pickup';
+        order.deliveryPartnerId = null; // Unassign
+        order.statusHistory = history;
+        
+        await order.save();
+
+        await sendNotification('admin', null, 'Delivery Rejected', `Wishmaster ${req.deliveryPartner.name} rejected delivery for Order #${order._id.toString().slice(-8).toUpperCase()}`, order._id);
+        
+        emitOrderUpdate(order);
+
+        res.json({ success: true, message: 'Order rejected successfully.' });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+};
+
 // Pickup Order (Seller -> Wishmaster handoff)
 const pickupOrder = async (req, res) => {
     try {
@@ -466,4 +504,31 @@ const deliverReturn = async (req, res) => {
     }
 };
 
-export { getMyDeliveries, acceptDelivery, pickupOrder, deliverOrder, updateDeliveryStatus, collectCOD, getDeliveryEarnings, requestDeliveryPayout, pickupReturn, deliverReturn };
+const getLiveLocations = async (req, res) => {
+    try {
+        const twoHoursAgo = Date.now() - (2 * 60 * 60 * 1000);
+
+        // Fetch from MongoDB - all delivery partners with a recent GPS update
+        const partners = await userModel.find({
+            isDeliveryPartner: true,
+            'liveLocation.lat': { $ne: null },
+            'liveLocation.updatedAt': { $gte: twoHoursAgo }
+        }).select('name phone serviceCity liveLocation');
+
+        const locations = partners.map(p => ({
+            deliveryId: p._id.toString(),
+            name: p.name,
+            phone: p.phone,
+            lat: p.liveLocation.lat,
+            lng: p.liveLocation.lng,
+            timestamp: p.liveLocation.updatedAt
+        }));
+
+        res.json({ success: true, locations });
+    } catch (error) {
+        console.error("Error fetching live locations:", error);
+        res.json({ success: false, message: error.message });
+    }
+};
+
+export { getMyDeliveries, acceptDelivery, rejectDelivery, pickupOrder, deliverOrder, updateDeliveryStatus, collectCOD, getDeliveryEarnings, requestDeliveryPayout, pickupReturn, deliverReturn, getLiveLocations };

@@ -6,6 +6,7 @@ import { Settings as SettingsIcon, Save, RefreshCw } from 'lucide-react';
 
 const GlobalSettings = ({ token, role }) => {
     const [platformCommission, setPlatformCommission] = useState(10);
+    const [autoAssignDelivery, setAutoAssignDelivery] = useState(false);
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(true);
 
@@ -17,6 +18,7 @@ const GlobalSettings = ({ token, role }) => {
             });
             if (res.data.success && res.data.settings) {
                 setPlatformCommission(res.data.settings.platformCommission);
+                setAutoAssignDelivery(res.data.settings.autoAssignDelivery || false);
             }
         } catch (error) {
             console.error(error);
@@ -36,7 +38,7 @@ const GlobalSettings = ({ token, role }) => {
             setLoading(true);
             const res = await axios.post(
                 `${backendUrl}/api/settings/update`, 
-                { platformCommission: Number(platformCommission) },
+                { platformCommission: Number(platformCommission), autoAssignDelivery },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
@@ -114,6 +116,27 @@ const GlobalSettings = ({ token, role }) => {
                                         This percentage is automatically deducted from the seller's earnings during automated Razorpay payouts.
                                     </p>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div className="pt-6 border-t border-slate-100">
+                            <h2 className="text-lg font-bold text-slate-900 mb-2">Automation Engine (Auto-Pilot)</h2>
+                            <p className="text-sm text-slate-500 font-medium mb-6">
+                                Enable this to automatically accept orders with available inventory and instantly assign them to online delivery boys.
+                            </p>
+                            <div className="flex items-center gap-4">
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        className="sr-only peer" 
+                                        checked={autoAssignDelivery}
+                                        onChange={() => setAutoAssignDelivery(!autoAssignDelivery)}
+                                    />
+                                    <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600 shadow-inner"></div>
+                                    <span className="ml-3 text-sm font-bold text-slate-700">
+                                        {autoAssignDelivery ? "Auto-Pilot is ON" : "Auto-Pilot is OFF"}
+                                    </span>
+                                </label>
                             </div>
                         </div>
 

@@ -113,7 +113,7 @@ const Finances = ({ token, role }) => {
           </div>
           <div>
             <p className='text-sm font-semibold text-slate-500'>Gross Platform Sales</p>
-            <h3 className='text-2xl font-black text-slate-900 mt-1'>{currency}{summary.grossSales.toLocaleString()}</h3>
+            <h3 className='text-2xl font-black text-slate-900 mt-1'>{currency}{summary.grossSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
             <p className='text-xs font-semibold text-slate-400 mt-1'>From delivered orders</p>
           </div>
         </div>
@@ -126,7 +126,7 @@ const Finances = ({ token, role }) => {
           </div>
           <div className='relative z-10'>
             <p className='text-sm font-semibold text-indigo-100/90'>Platform Profit (10%)</p>
-            <h3 className='text-2xl font-black mt-1 text-white'>{currency}{summary.platformCommission.toLocaleString()}</h3>
+            <h3 className='text-2xl font-black mt-1 text-white'>{currency}{summary.platformCommission.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
             <p className='text-xs font-semibold text-indigo-200 mt-1'>Total commission earned</p>
           </div>
         </div>
@@ -139,7 +139,7 @@ const Finances = ({ token, role }) => {
           </div>
           <div className='relative z-10'>
             <p className='text-sm font-semibold text-slate-500'>Pending Payables</p>
-            <h3 className='text-2xl font-black text-slate-900 mt-1'>{currency}{summary.pendingPayables.toLocaleString()}</h3>
+            <h3 className='text-2xl font-black text-slate-900 mt-1'>{currency}{summary.pendingPayables.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
             <p className='text-xs font-bold text-orange-600 mt-1'>To be paid to sellers</p>
           </div>
         </div>
@@ -151,7 +151,7 @@ const Finances = ({ token, role }) => {
           </div>
           <div>
             <p className='text-sm font-semibold text-slate-500'>Total Paid to Sellers</p>
-            <h3 className='text-2xl font-black text-slate-900 mt-1'>{currency}{summary.totalPaid.toLocaleString()}</h3>
+            <h3 className='text-2xl font-black text-slate-900 mt-1'>{currency}{summary.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
             <p className='text-xs font-semibold text-slate-400 mt-1'>Lifetime completed payouts</p>
           </div>
         </div>

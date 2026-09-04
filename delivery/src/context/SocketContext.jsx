@@ -50,6 +50,39 @@ export const SocketProvider = ({ children, token, role }) => {
         }
     }, [token, role]);
 
+    useEffect(() => {
+        let watchId;
+        if (socket && token && role === 'delivery') {
+            if ('geolocation' in navigator) {
+                watchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        socket.emit('update-location', {
+                            lat: latitude,
+                            lng: longitude
+                        });
+                    },
+                    (error) => {
+                        console.warn('Geolocation error:', error.message);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        maximumAge: 10000,
+                        timeout: 5000
+                    }
+                );
+            } else {
+                console.warn('Geolocation is not supported by your browser.');
+            }
+        }
+
+        return () => {
+            if (watchId !== undefined && 'geolocation' in navigator) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+        };
+    }, [socket, token, role]);
+
     const markAsRead = async (ids) => {
         try {
             await axios.post(backendUrl + '/api/notification/read', { notificationIds: ids }, { 

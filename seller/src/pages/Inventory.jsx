@@ -3,14 +3,20 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import { Boxes, AlertTriangle, CheckCircle2, XCircle, Save, RefreshCw } from 'lucide-react';
 
-const currency = '$';
+const currency = '₹';
 
 const Inventory = ({ token, searchQuery }) => {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
-  const [editStockMap, setEditStockMap] = useState({});
+  const [editCityStockMap, setEditCityStockMap] = useState({});
   const [savingId, setSavingId] = useState(null);
+
+  const CITIES = [
+    { id: 'WH_NAGPUR', name: 'Nagpur' },
+    { id: 'WH_WARDHA', name: 'Wardha' },
+    { id: 'WH_DHAMANGAON', name: 'Dhamangaon Rly' }
+  ];
 
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
 
@@ -41,19 +47,75 @@ const Inventory = ({ token, searchQuery }) => {
 
   const handleStartEdit = (item) => {
     setEditingId(item._id);
-    setEditStockMap({ ...item.stock });
+    
+    const initialMap = {
+        WH_NAGPUR: {},
+        WH_WARDHA: {},
+        WH_DHAMANGAON: {}
+    };
+
+    if (item.warehouseInventory && item.warehouseInventory.length > 0) {
+        item.warehouseInventory.forEach(wh => {
+            if (initialMap[wh.warehouseId] !== undefined) {
+                initialMap[wh.warehouseId] = { ...(wh.stockMap || {}) };
+            }
+        });
+        
+        // Ensure all available sizes have a key, even if 0
+        item.sizes?.forEach(size => {
+            CITIES.forEach(c => {
+                if (initialMap[c.id][size] === undefined) {
+                    initialMap[c.id][size] = 0;
+                }
+            });
+        });
+    } else {
+        item.sizes?.forEach(size => {
+            initialMap.WH_NAGPUR[size] = item.stock?.[size] || 0;
+            initialMap.WH_WARDHA[size] = 0;
+            initialMap.WH_DHAMANGAON[size] = 0;
+        });
+    }
+
+    setEditCityStockMap(initialMap);
   };
 
-  const handleStockValueChange = (size, qty) => {
-    setEditStockMap(prev => ({ ...prev, [size]: Number(qty) }));
+  const handleStockValueChange = (city, size, qty) => {
+    setEditCityStockMap(prev => ({
+        ...prev,
+        [city]: {
+            ...prev[city],
+            [size]: Number(qty)
+        }
+    }));
   };
 
   const handleSaveStock = async (productId) => {
     try {
       setSavingId(productId);
+
+      const legacyStock = {};
+      const newWarehouseInventory = [];
+      
+      Object.entries(editCityStockMap).forEach(([city, sizeMap]) => {
+          let cityTotal = 0;
+          Object.entries(sizeMap).forEach(([size, qty]) => {
+              legacyStock[size] = (legacyStock[size] || 0) + qty;
+              cityTotal += qty;
+          });
+          
+          newWarehouseInventory.push({
+              warehouseId: city,
+              stock: cityTotal,
+              stockMap: sizeMap,
+              reserved: 0
+          });
+      });
+
       const response = await axios.post(`${backendUrl}/api/seller/inventory/update`, {
         productId,
-        stock: editStockMap
+        stock: legacyStock,
+        warehouseInventory: JSON.stringify(newWarehouseInventory)
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -144,38 +206,69 @@ const Inventory = ({ token, searchQuery }) => {
                         {currency}{item.price}
                       </td>
 
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 min-w-[300px]">
                         {isEditing ? (
-                          <div className="flex flex-wrap gap-2">
-                            {item.sizes?.map(size => (
-                              <div key={size} className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded">
-                                <span className="font-bold text-[10px] text-slate-600">{size}:</span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={editStockMap[size] !== undefined ? editStockMap[size] : 0}
-                                  onChange={(e) => handleStockValueChange(size, e.target.value)}
-                                  className="w-12 px-1 py-0.5 bg-white border border-slate-300 rounded text-xs font-bold text-slate-900"
-                                />
-                              </div>
+                          <div className="space-y-4">
+                            {CITIES.map(city => (
+                                <div key={city.id} className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">{city.name}</div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {item.sizes?.map(size => (
+                                            <div key={size} className="flex items-center gap-1 bg-white px-2 py-1 rounded border border-slate-200 shadow-xs">
+                                                <span className="font-bold text-[10px] text-slate-600">{size}:</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={editCityStockMap[city.id]?.[size] || 0}
+                                                    onChange={(e) => handleStockValueChange(city.id, size, e.target.value)}
+                                                    className="w-12 px-1 py-0.5 bg-white border border-slate-300 rounded text-xs font-bold text-slate-900 focus:ring-1 focus:ring-slate-900"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             ))}
                           </div>
                         ) : (
-                          <div className="flex flex-wrap gap-1.5">
-                            {Object.entries(item.stock || {}).map(([sz, count]) => (
-                              <span
-                                key={sz}
-                                className={`px-2 py-0.5 rounded text-[11px] font-bold border ${
-                                  Number(count) === 0
-                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                    : Number(count) <= 5
-                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                    : 'bg-slate-100 text-slate-700 border-slate-200'
-                                }`}
-                              >
-                                {sz}: {count}
-                              </span>
-                            ))}
+                          <div className="space-y-2">
+                            {item.warehouseInventory && item.warehouseInventory.length > 0 ? (
+                                item.warehouseInventory.map(wh => {
+                                    const cityName = CITIES.find(c => c.id === wh.warehouseId)?.name || wh.warehouseId;
+                                    return (
+                                        <div key={wh.warehouseId} className="flex items-start gap-2">
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase w-16 shrink-0">{cityName}:</span>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {Object.entries(wh.stockMap || {}).map(([sz, count]) => {
+                                                    if (count === 0) return null;
+                                                    return (
+                                                        <span key={sz} className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                                            {sz}: {count}
+                                                        </span>
+                                                    );
+                                                })}
+                                                {wh.stock === 0 && <span className="text-[10px] text-rose-500 font-medium">Empty</span>}
+                                            </div>
+                                        </div>
+                                    )
+                                })
+                            ) : (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {Object.entries(item.stock || {}).map(([sz, count]) => (
+                                    <span
+                                        key={sz}
+                                        className={`px-2 py-0.5 rounded text-[11px] font-bold border ${
+                                        Number(count) === 0
+                                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                            : Number(count) <= 5
+                                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                            : 'bg-slate-100 text-slate-700 border-slate-200'
+                                        }`}
+                                    >
+                                        {sz}: {count}
+                                    </span>
+                                    ))}
+                                </div>
+                            )}
                           </div>
                         )}
                       </td>

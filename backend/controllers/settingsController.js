@@ -4,7 +4,7 @@ import settingsModel from "../models/settingsModel.js";
 const initializeSettings = async () => {
     let settings = await settingsModel.findOne();
     if (!settings) {
-        settings = new settingsModel({ platformCommission: 10 });
+        settings = new settingsModel({ platformCommission: 10, autoAssignDelivery: false });
         await settings.save();
     }
     return settings;
@@ -24,12 +24,17 @@ export const getSettings = async (req, res) => {
 // Update settings
 export const updateSettings = async (req, res) => {
     try {
-        const { platformCommission } = req.body;
+        const { platformCommission, autoAssignDelivery } = req.body;
         
         let settings = await initializeSettings();
         
         if (platformCommission !== undefined) {
             settings.platformCommission = platformCommission;
+            settings.updatedAt = Date.now();
+        }
+        
+        if (autoAssignDelivery !== undefined) {
+            settings.autoAssignDelivery = autoAssignDelivery;
             settings.updatedAt = Date.now();
         }
 

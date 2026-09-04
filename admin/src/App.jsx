@@ -23,12 +23,15 @@ import AddVideo from './pages/AddVideo'
 import ManageVideos from './pages/ManageVideos'
 import GlobalSettings from './pages/Settings'
 import Login from './components/Login'
+import LiveMap from './pages/LiveMap'
 import { SocketProvider } from './context/SocketContext'
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+import ErrorBoundary from './components/ErrorBoundary'
+
 export const backendUrl = import.meta.env.VITE_BACKEND_URL
-export const currency = '$'
+export const currency = '₹'
 
 const App = () => {
 
@@ -41,7 +44,7 @@ const App = () => {
   }, [token, role])
 
   return (
-    <div className='bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-50 via-white to-fuchsia-50 h-screen overflow-hidden text-slate-900 selection:bg-indigo-500 selection:text-white flex flex-col font-sans antialiased'>
+    <div className='bg-slate-50 h-screen overflow-hidden text-slate-900 selection:bg-indigo-500 selection:text-white flex flex-col font-sans antialiased'>
       <ToastContainer position="top-right" autoClose={3000} />
       {token === ""
         ? <Login setToken={setToken} setRole={setRole} />
@@ -57,31 +60,34 @@ const App = () => {
             <Sidebar role={role} />
 
             {/* Main content area scrolls independently */}
-            <main className='flex-1 h-full overflow-y-auto overflow-x-hidden bg-transparent custom-scrollbar'>
+            <main className='flex-1 h-full overflow-y-auto overflow-x-hidden bg-transparent custom-scrollbar scroll-smooth' style={{ WebkitOverflowScrolling: 'touch' }}>
               <div className='max-w-[1400px] mx-auto px-4 sm:px-8 py-6 w-full'>
-                <Routes>
-                  <Route path='/' element={<Dashboard token={token} />} />
-                  <Route path='/dashboard' element={<Dashboard token={token} />} />
-                  <Route path='/flash-sale' element={<FlashSaleManager token={token} />} />
-                  <Route path='/trending' element={<TrendingManagement token={token} />} />
-                  <Route path='/bank-offers' element={<BankOffers token={token} />} />
-                  <Route path='/subscriptions' element={<Subscriptions token={token} />} />
-                  <Route path='/add' element={<Add token={token} />} />
-                  <Route path='/list' element={<List token={token} />} />
-                  <Route path='/orders' element={<Orders token={token} />} />
-                  <Route path='/reviews' element={<Reviews token={token} />} />
-                  <Route path='/sellers' element={<Sellers token={token} />} />
-                  <Route path='/delivery-partners' element={<DeliveryPartners token={token} />} />
-                  <Route path='/product-approvals' element={<ProductApprovals token={token} />} />
-                  <Route path='/sub-admins' element={<SubAdmins token={token} />} />
-                  <Route path='/coupons' element={<Coupons token={token} />} />
-                  <Route path='/finances' element={<Finances token={token} role={role} />} />
-                  <Route path='/analytics' element={<Analytics token={token} />} />
-                  <Route path='/stories' element={<Stories token={token} />} />
-                  <Route path='/add-video' element={<AddVideo token={token} />} />
-                  <Route path='/manage-videos' element={<ManageVideos token={token} />} />
-                  <Route path='/settings' element={<GlobalSettings token={token} role={role} />} />
-                </Routes>
+                <ErrorBoundary>
+                  <Routes>
+                    <Route path='/' element={<Dashboard token={token} />} />
+                    <Route path='/dashboard' element={<Dashboard token={token} />} />
+                    <Route path='/flash-sale' element={<FlashSaleManager token={token} />} />
+                    <Route path='/trending' element={<TrendingManagement token={token} />} />
+                    <Route path='/bank-offers' element={<BankOffers token={token} />} />
+                    <Route path='/subscriptions' element={<Subscriptions token={token} />} />
+                    <Route path='/add' element={<Add token={token} />} />
+                    <Route path='/list' element={<List token={token} />} />
+                    <Route path='/orders' element={<Orders token={token} />} />
+                    <Route path='/reviews' element={<Reviews token={token} />} />
+                    <Route path='/sellers' element={<Sellers token={token} />} />
+                    <Route path='/delivery-partners' element={<DeliveryPartners token={token} />} />
+                    <Route path='/live-map' element={<LiveMap token={token} />} />
+                    <Route path='/product-approvals' element={<ProductApprovals token={token} />} />
+                    <Route path='/sub-admins' element={<SubAdmins token={token} />} />
+                    <Route path='/coupons' element={<Coupons token={token} />} />
+                    <Route path='/finances' element={<Finances token={token} role={role} />} />
+                    <Route path='/analytics' element={<Analytics token={token} />} />
+                    <Route path='/stories' element={<Stories token={token} />} />
+                    <Route path='/add-video' element={<AddVideo token={token} />} />
+                    <Route path='/manage-videos' element={<ManageVideos token={token} />} />
+                    <Route path='/settings' element={<GlobalSettings token={token} role={role} />} />
+                  </Routes>
+                </ErrorBoundary>
               </div>
             </main>
           </div>
